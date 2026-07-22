@@ -95,3 +95,54 @@ def chronological_split(
         raise ValueError("Chronological split produced an empty partition.")
 
     return InteractionSplits(train, validation, test)
+
+def leave_last_two_split(
+    interactions: pd.DataFrame,
+) -> InteractionSplits:
+    required = {"user_id", "item_id", "timestamp"}
+    missing = required - set(interactions.columns)
+
+    if missing:
+        raise ValueError(f"Missing columns: {sorted(missing)}")
+
+    ordered = interactions.sort_values(
+        ["user_id", "timestamp", "item_id"]
+    ).copy()
+
+    ordered["_position"] = ordered.groupby("user_id").cumcount()
+    ordered["_user_count"] = ordered.groupby("user_id")[
+        "item_id"
+    ].transform("size")
+
+    if (ordered["_user_count"] < 3).any():
+        raise ValueError(
+            "Every user must have at least three interactions."
+        )
+
+    ordered["_position_from_end"] = (
+        ordered["_user_count"] - ordered["_position"] - 1
+    )
+
+    train = ordered.loc[
+        ordered["_position_from_end"] >= 2
+    ].copy()
+    validation = ordered.loc[
+        ordered["_position_from_end"] == 1
+    ].copy()
+    test = ordered.loc[
+        ordered["_position_from_end"] == 0
+    ].copy()
+
+    helper_columns = [
+        "_position",
+        "_user_count",
+        "_position_from_end",
+    ]
+
+    train = train.drop(columns=helper_columns).reset_index(drop=True)
+    validation = validation.drop(
+        columns=helper_columns
+    ).reset_index(drop=True)
+    test = test.drop(columns=helper_columns).reset_index(drop=True)
+
+    return InteractionSplits(train, validation, test)
