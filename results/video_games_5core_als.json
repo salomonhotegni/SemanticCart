@@ -1,0 +1,26 @@
+{
+  "dataset": "video_games_5core",
+  "model": "implicit_als",
+  "k": 10,
+  "config": {
+    "factors": 64,
+    "regularization": 0.05,
+    "alpha": 20.0,
+    "iterations": 20,
+    "random_state": 42,
+    "batch_size": 1024
+  },
+  "train_interactions": 625062,
+  "validation_interactions": 94762,
+  "train_users": 94762,
+  "train_items": 25527,
+  "cold_user_rate": 0.0,
+  "unseen_item_event_rate": 0.0017200987737700766,
+  "training_seconds": 10.32699395599775,
+  "recommendation_seconds": 13.568094333008048,
+  "recommendation_users_per_second": 6984.179036068896,
+  "recall_at_k": 0.08135117452143265,
+  "ndcg_at_k": 0.04350510760412205,
+  "mrr_at_k": 0.03204451134554973,
+  "catalog_coverage": 0.07866180906491166
+}
