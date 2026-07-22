@@ -1,0 +1,15 @@
+{
+  "dataset": "video_games_5core",
+  "model": "popularity",
+  "k": 10,
+  "train_interactions": 625062,
+  "validation_interactions": 94762,
+  "train_users": 94762,
+  "train_items": 25527,
+  "cold_user_rate": 0.0,
+  "unseen_item_event_rate": 0.0017200987737700766,
+  "recall_at_k": 0.02678288765538929,
+  "ndcg_at_k": 0.013567916275189081,
+  "mrr_at_k": 0.00966264941777278,
+  "catalog_coverage": 0.0007834841540329847
+}
