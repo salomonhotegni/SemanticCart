@@ -1,0 +1,10 @@
+.env
+.venv/
+.venv_sc/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+data/raw/amazon/
+data/processed/
+data/artifacts/
+.ipynb_checkpoints/
