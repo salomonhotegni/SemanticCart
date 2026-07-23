@@ -1,0 +1,20 @@
+{
+  "model": "text-embedding-3-small",
+  "dimensions": 512,
+  "pricing_as_of": "2026-07-23",
+  "sync_price_per_million_tokens_usd": 0.02,
+  "batch_discount": 0.5,
+  "training_products": 25527,
+  "unique_content_hashes": 25349,
+  "cached_content_hashes": 0,
+  "missing_embedding_requests": 25349,
+  "total_tokens": 8916545,
+  "missing_tokens": 8916545,
+  "tokens_p50": 268,
+  "tokens_p95": 1141,
+  "tokens_max": 1786,
+  "invalid_inputs": 0,
+  "estimated_full_sync_cost_usd": 0.1783309,
+  "estimated_full_batch_cost_usd": 0.08916545,
+  "estimated_incremental_batch_cost_usd": 0.08916545
+}
