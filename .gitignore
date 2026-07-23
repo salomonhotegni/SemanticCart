@@ -8,3 +8,4 @@ data/raw/amazon/
 data/processed/
 data/artifacts/
 .ipynb_checkpoints/
+/roadmap.txt
