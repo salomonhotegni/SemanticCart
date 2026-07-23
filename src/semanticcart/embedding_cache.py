@@ -1,8 +1,4 @@
-"""
-This file generates OpenAI embeddings for new or changed product text, 
-caches them by content and model configuration, 
-and reuses unchanged vectors to avoid repeated API calls.
-"""
+"""Generate and cache versioned OpenAI product embeddings."""
 
 from dataclasses import dataclass
 from hashlib import sha256
@@ -15,12 +11,22 @@ from openai import OpenAI
 
 @dataclass(frozen=True)
 class EmbeddingConfig:
+    """Configure OpenAI catalogue embedding requests.
+
+    Attributes:
+        model: Embedding model identifier.
+        dimensions: Number of dimensions requested for each vector.
+        batch_size: Maximum number of catalogue texts sent per API call.
+    """
+
     model: str = "text-embedding-3-small"
     dimensions: int = 512
     batch_size: int = 64
 
 
 def content_hash(text: str) -> str:
+    """Return a stable SHA-256 identifier for normalized product text."""
+
     return sha256(text.encode("utf-8")).hexdigest()
 
 
@@ -29,6 +35,24 @@ def embed_catalog(
     cache_path: str | Path,
     config: EmbeddingConfig = EmbeddingConfig(),
 ) -> pd.DataFrame:
+    """Attach cached or newly generated embeddings to a product catalogue.
+
+    Cache entries are keyed by content hash, model, and dimensions. An OpenAI
+    client is created only when at least one unique text requires embedding.
+
+    Args:
+        catalog: Products containing product_id and catalog_text.
+        cache_path: Parquet file used to persist versioned embeddings.
+        config: Embedding model, dimensionality, and request batch size.
+
+    Returns:
+        The catalogue with an embedding column joined by product_id.
+
+    Raises:
+        OpenAIError: If new embeddings are required and API authentication or
+            the embeddings request fails.
+    """
+
     cache_path = Path(cache_path)
     work = catalog[["product_id", "catalog_text"]].copy()
     work["content_hash"] = work["catalog_text"].map(content_hash)

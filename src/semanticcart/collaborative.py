@@ -1,3 +1,5 @@
+"""Train and serve an implicit-feedback ALS collaborative recommender."""
+
 from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
@@ -6,11 +8,22 @@ import numpy as np
 import pandas as pd
 from implicit.cpu.als import AlternatingLeastSquares
 from scipy.sparse import csr_matrix
-
 from threadpoolctl import threadpool_limits
+
 
 @dataclass(frozen=True)
 class ALSConfig:
+    """Configure implicit Alternating Least Squares training and retrieval.
+
+    Attributes:
+        factors: Number of latent dimensions for users and items.
+        regularization: L2 regularization applied during factor updates.
+        alpha: Confidence multiplier for observed binary interactions.
+        iterations: Number of alternating optimization passes.
+        random_state: Seed used to initialize latent factors.
+        batch_size: Number of users passed to batched recommendation.
+    """
+
     factors: int = 64
     regularization: float = 0.05
     alpha: float = 20.0
@@ -20,6 +33,12 @@ class ALSConfig:
 
 
 class ALSRecommender:
+    """Recommend unseen products from implicit user-item latent factors.
+
+    User and item arrays preserve the row and column alignment of user_items
+    and the trained implicit model.
+    """
+
     def __init__(
         self,
         model: AlternatingLeastSquares,
@@ -44,6 +63,23 @@ class ALSRecommender:
         interactions: pd.DataFrame,
         config: ALSConfig | None = None,
     ) -> "ALSRecommender":
+        """Fit ALS to a binary sparse interaction matrix.
+
+        Repeated user-item events are collapsed to one positive observation.
+        BLAS is limited to one thread while implicit uses its native parallel
+        training implementation.
+
+        Args:
+            interactions: Training events containing user_id and item_id.
+            config: Optional ALS hyperparameters and retrieval batch size.
+
+        Returns:
+            A fitted recommender with ID mappings and the training matrix.
+
+        Raises:
+            ValueError: If a required interaction column is missing.
+        """
+
         config = config or ALSConfig()
         required_columns = {"user_id", "item_id"}
         missing = required_columns - set(interactions.columns)
@@ -103,6 +139,21 @@ class ALSRecommender:
         user_ids: Iterable[str],
         k: int = 10,
     ) -> pd.DataFrame:
+        """Generate batched Top-K collaborative recommendations.
+
+        Args:
+            user_ids: Known training users to score; duplicates are removed in
+                input order.
+            k: Maximum number of unseen products returned per user.
+
+        Returns:
+            Rows containing user_id, item_id, one-based rank, and
+            collaborative_score.
+
+        Raises:
+            ValueError: If k is not positive or a user was unseen in training.
+        """
+
         if k <= 0:
             raise ValueError("k must be greater than zero.")
 
@@ -175,6 +226,13 @@ class ALSRecommender:
         return pd.concat(recommendation_frames, ignore_index=True)
 
     def save(self, directory: str | Path) -> None:
+        """Persist the ALS model and row-to-ID mappings.
+
+        Args:
+            directory: Output directory for als_model.npz, users.parquet, and
+                items.parquet.
+        """
+
         directory = Path(directory)
         directory.mkdir(parents=True, exist_ok=True)
 

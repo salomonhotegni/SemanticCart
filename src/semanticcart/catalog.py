@@ -1,7 +1,4 @@
-"""
-This file loads, validates, cleans, deduplicates, 
-and combines product catalogue fields into embedding-ready text.
-"""
+"""Load and normalize product catalogues for semantic recommendation."""
 from __future__ import annotations
 
 from pathlib import Path
@@ -14,7 +11,19 @@ OPTIONAL_TEXT_COLUMNS = ["category", "brand", "attributes"]
 
 
 def load_catalog(path: str | Path) -> pd.DataFrame:
-    """Load and normalize a product catalogue for recommendation experiments."""
+    """Load a CSV product catalogue and build embedding-ready text.
+
+    Args:
+        path: CSV file containing product_id, title, and description.
+            Category, brand, and attributes are included when present.
+
+    Returns:
+        A deduplicated catalogue with normalized text fields and a
+        catalog_text column.
+
+    Raises:
+        ValueError: If a required catalogue column is missing.
+    """
     path = Path(path)
     df = pd.read_csv(path)
 
@@ -41,7 +50,14 @@ def load_catalog(path: str | Path) -> pd.DataFrame:
 
 
 def build_catalog_text(row: pd.Series) -> str:
-    """Create the text sent to embedding models."""
+    """Combine one normalized product row into labelled semantic text.
+
+    Args:
+        row: Product fields containing at least title and description.
+
+    Returns:
+        Newline-separated text suitable for an embedding model.
+    """
     parts = [
         f"Title: {row.get('title', '')}",
         f"Description: {row.get('description', '')}",

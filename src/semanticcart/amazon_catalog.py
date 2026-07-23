@@ -1,3 +1,5 @@
+"""Prepare Amazon product metadata for semantic recommendation models."""
+
 import html
 import math
 import re
@@ -39,6 +41,8 @@ PRICE_PATTERN = re.compile(r"\d[\d,]*(?:\.\d+)?")
 
 
 def clean_text(value: object) -> str:
+    """Normalize one metadata value into plain single-spaced text."""
+
     if value is None:
         return ""
 
@@ -48,6 +52,8 @@ def clean_text(value: object) -> str:
 
 
 def join_text(values: object) -> str:
+    """Normalize and concatenate a scalar or sequence of metadata values."""
+
     if not isinstance(values, (list, tuple)):
         return clean_text(values)
 
@@ -60,6 +66,8 @@ def join_text(values: object) -> str:
 
 
 def parse_price(value: object) -> float | None:
+    """Extract the first finite numeric price from a metadata value."""
+
     if isinstance(value, (int, float)):
         price = float(value)
         return price if math.isfinite(price) else None
@@ -73,6 +81,8 @@ def parse_price(value: object) -> float | None:
 
 
 def select_image_url(images: object) -> str:
+    """Select the first available large, high-resolution, or thumbnail URL."""
+
     if not isinstance(images, dict):
         return ""
 
@@ -91,6 +101,17 @@ def select_image_url(images: object) -> str:
 
 
 def build_product_record(row: dict) -> dict:
+    """Convert one raw Amazon metadata row into a model-ready product record.
+
+    Args:
+        row: Raw metadata containing parent_asin and optional descriptive
+            fields, price, and image variants.
+
+    Returns:
+        A normalized record with item_id, display fields, and catalog_text
+        capped at 6,000 characters.
+    """
+
     title = clean_text(row.get("title"))
     main_category = clean_text(row.get("main_category"))
     categories = join_text(row.get("categories"))
@@ -132,6 +153,24 @@ def load_amazon_catalog(
     item_ids: Iterable[str] | None = None,
     batch_size: int = 8192,
 ) -> pd.DataFrame:
+    """Load selected products from Amazon metadata without loading it all.
+
+    Duplicate parent_asin records are resolved by retaining the record with
+    the longest catalog_text.
+
+    Args:
+        path: Amazon metadata Parquet file.
+        item_ids: Optional product IDs to retain; all products are loaded when
+            omitted.
+        batch_size: Number of Parquet rows processed at a time.
+
+    Returns:
+        A sorted, deduplicated catalogue using OUTPUT_COLUMNS.
+
+    Raises:
+        FileNotFoundError: If the metadata file does not exist.
+    """
+
     path = Path(path)
 
     if not path.exists():

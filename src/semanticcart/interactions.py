@@ -1,7 +1,4 @@
-"""
-This module provides functions to load and process 
-user-item interaction data for recommendation systems.
-"""
+"""Load, clean, and chronologically split user-item interactions."""
 
 from dataclasses import dataclass
 from pathlib import Path
@@ -22,12 +19,31 @@ VALIDATION_END_MS = 1658002729837
 
 @dataclass(frozen=True)
 class InteractionSplits:
+    """Chronologically ordered interaction partitions.
+
+    Attributes:
+        train: Events available to model fitting.
+        validation: Later events used for model selection.
+        test: Latest events reserved for final evaluation.
+    """
+
     train: pd.DataFrame
     validation: pd.DataFrame
     test: pd.DataFrame
 
 
 def load_interactions(path: str | Path) -> pd.DataFrame:
+    """Load and normalize compressed Amazon Reviews interactions.
+
+    Args:
+        path: Gzip-compressed CSV containing user_id, parent_asin, rating,
+            and millisecond timestamp.
+
+    Returns:
+        Events sorted chronologically with parent_asin renamed to item_id and
+        a UTC event_time column added.
+    """
+
     interactions = pd.read_csv(
         path,
         compression="gzip",
@@ -79,6 +95,21 @@ def chronological_split(
     train_end_ms: int = TRAIN_END_MS,
     validation_end_ms: int = VALIDATION_END_MS,
 ) -> InteractionSplits:
+    """Split interactions using two absolute millisecond cutoffs.
+
+    Args:
+        interactions: Events containing a numeric timestamp column.
+        train_end_ms: Exclusive upper timestamp for the training partition.
+        validation_end_ms: Exclusive upper timestamp for validation; later
+            events enter the test partition.
+
+    Returns:
+        Non-empty train, validation, and test partitions.
+
+    Raises:
+        ValueError: If cutoffs are out of order or any partition is empty.
+    """
+
     if train_end_ms >= validation_end_ms:
         raise ValueError("Training cutoff must precede validation cutoff.")
 
@@ -96,9 +127,26 @@ def chronological_split(
 
     return InteractionSplits(train, validation, test)
 
+
 def leave_last_two_split(
     interactions: pd.DataFrame,
 ) -> InteractionSplits:
+    """Hold out each user's two latest interactions.
+
+    The latest event becomes test, the second latest becomes validation, and
+    all earlier events become training. Ties are resolved by item_id.
+
+    Args:
+        interactions: Events containing user_id, item_id, and timestamp.
+
+    Returns:
+        Per-user chronological train, validation, and test partitions.
+
+    Raises:
+        ValueError: If required columns are missing or a user has fewer than
+            three interactions.
+    """
+
     required = {"user_id", "item_id", "timestamp"}
     missing = required - set(interactions.columns)
 

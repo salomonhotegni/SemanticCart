@@ -1,7 +1,4 @@
-"""
-This module provides a function to recommend products 
-based on semantic similarity using embeddings.
-"""
+"""Rank products using recency-weighted semantic embedding similarity."""
 
 from collections.abc import Sequence
 
@@ -16,6 +13,25 @@ def recommend_semantic(
     k: int = 10,
     recency_decay: float = 0.85,
 ) -> pd.DataFrame:
+    """Recommend unseen products from a sequence of viewed product embeddings.
+
+    The last viewed product is treated as the most recent. Product and user
+    vectors are L2-normalized, making the resulting score cosine similarity.
+
+    Args:
+        catalog: Products containing product_id, title, and embedding.
+        viewed_product_ids: Ordered product history from oldest to newest.
+        k: Maximum number of unique unseen products to return.
+        recency_decay: Multiplicative weight applied per step into the past.
+
+    Returns:
+        Products ranked by descending semantic_score with one-based ranks.
+
+    Raises:
+        ValueError: If required columns are missing, inputs are invalid, or a
+            viewed product is absent from the catalogue.
+    """
+
     required = {"product_id", "title", "embedding"}
     missing_columns = required - set(catalog.columns)
 

@@ -1,19 +1,31 @@
+"""Provide a global item-popularity recommendation baseline."""
+
 from collections.abc import Iterable
 
 import pandas as pd
 
 
 class PopularityModel:
-    """
-    A simple popularity-based recommendation model.
-    It ranks items based on their popularity (number of interactions) and recommends
-    the most popular items to users, excluding items they have already interacted with.
-    """
+    """Recommend globally popular products that each user has not seen."""
+
     def __init__(self, ranking: pd.DataFrame) -> None:
         self.ranking = ranking.reset_index(drop=True)
 
     @classmethod
     def fit(cls, interactions: pd.DataFrame) -> "PopularityModel":
+        """Count interactions and construct a deterministic item ranking.
+
+        Args:
+            interactions: Training events containing item_id.
+
+        Returns:
+            A model ranked by descending interaction count, with item_id used
+            to break ties deterministically.
+
+        Raises:
+            ValueError: If item_id is missing.
+        """
+
         if "item_id" not in interactions.columns:
             raise ValueError("Interactions must contain item_id.")
 
@@ -36,6 +48,22 @@ class PopularityModel:
         seen_interactions: pd.DataFrame,
         k: int = 10,
     ) -> pd.DataFrame:
+        """Return each user's Top-K globally popular unseen products.
+
+        Args:
+            user_ids: Users to score; duplicate IDs are removed in input order.
+            seen_interactions: Historical user_id and item_id pairs used to
+                filter already observed products.
+            k: Maximum number of recommendations per user.
+
+        Returns:
+            Rows containing user_id, item_id, one-based rank, and
+            popularity_score.
+
+        Raises:
+            ValueError: If k is not positive.
+        """
+
         if k <= 0:
             raise ValueError("k must be greater than zero.")
 

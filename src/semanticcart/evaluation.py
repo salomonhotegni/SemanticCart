@@ -10,6 +10,15 @@ import pandas as pd
 
 @dataclass(frozen=True)
 class RankingMetrics:
+    """Aggregate metrics for a Top-K recommendation evaluation.
+
+    Attributes:
+        recall_at_k: Mean fraction of relevant items retrieved per user.
+        ndcg_at_k: Mean rank-discounted gain normalized per user.
+        mrr_at_k: Mean reciprocal rank of each user's first hit.
+        catalog_coverage: Fraction of catalogue items appearing in results.
+    """
+
     recall_at_k: float
     ndcg_at_k: float
     mrr_at_k: float
@@ -22,6 +31,24 @@ def evaluate_ranking(
     catalog_size: int,
     k: int = 10,
 ) -> RankingMetrics:
+    """Evaluate ranked recommendations against held-out user-item events.
+
+    Users present in ground_truth but absent from recommendations contribute
+    zero to recall, NDCG, and MRR. Duplicate user-item pairs are counted once.
+
+    Args:
+        recommendations: Rows containing user_id, item_id, and one-based rank.
+        ground_truth: Relevant held-out user_id and item_id pairs.
+        catalog_size: Number of products eligible for recommendation.
+        k: Largest recommendation rank included in the metrics.
+
+    Returns:
+        User-averaged ranking metrics and global catalogue coverage.
+
+    Raises:
+        ValueError: If k or catalog_size is not positive.
+    """
+
     if k <= 0 or catalog_size <= 0:
         raise ValueError("k and catalog_size must be positive.")
 
