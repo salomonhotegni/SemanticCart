@@ -7,6 +7,7 @@ import pandas as pd
 from implicit.cpu.als import AlternatingLeastSquares
 from scipy.sparse import csr_matrix
 
+from threadpoolctl import threadpool_limits
 
 @dataclass(frozen=True)
 class ALSConfig:
@@ -78,15 +79,16 @@ class ALSRecommender:
         user_items.sum_duplicates()
         user_items.data[:] = 1.0
 
-        model = AlternatingLeastSquares(
-            factors=config.factors,
-            regularization=config.regularization,
-            alpha=config.alpha,
-            iterations=config.iterations,
-            random_state=config.random_state,
-        )
+        with threadpool_limits(limits=1, user_api="blas"):
+            model = AlternatingLeastSquares(
+                factors=config.factors,
+                regularization=config.regularization,
+                alpha=config.alpha,
+                iterations=config.iterations,
+                random_state=config.random_state,
+            )
 
-        model.fit(user_items, show_progress=True)
+            model.fit(user_items, show_progress=True)
 
         return cls(
             model=model,

@@ -6,3 +6,4 @@ openai
 pyarrow
 pytest
 implicit==0.7.3
+threadpoolctl
