@@ -1,0 +1,189 @@
+"""Build recency-weighted user profiles from dense product vectors."""
+
+from collections.abc import Iterable
+from dataclasses import dataclass
+
+import faiss
+import numpy as np
+import pandas as pd
+from scipy.sparse import csr_matrix
+
+from semanticcart.dense_index import DenseItemIndex
+
+
+@dataclass(frozen=True)
+class DenseProfileConfig:
+    """Configure dense user-profile construction.
+
+    Attributes:
+        recency_decay: Multiplicative weight per step into the past.
+    """
+
+    recency_decay: float = 0.85
+
+
+class DenseUserProfiles:
+    """Store normalized user vectors and their observed products."""
+
+    def __init__(
+        self,
+        item_index: DenseItemIndex,
+        user_ids: np.ndarray,
+        user_profiles: np.ndarray,
+        user_items: csr_matrix,
+        config: DenseProfileConfig,
+    ) -> None:
+        self.item_index = item_index
+        self.user_ids = user_ids
+        self.user_profiles = user_profiles
+        self.user_items = user_items
+        self.config = config
+
+        self.user_to_index = {
+            user_id: index
+            for index, user_id in enumerate(user_ids)
+        }
+
+    @classmethod
+    def build(
+        cls,
+        item_index: DenseItemIndex,
+        interactions: pd.DataFrame,
+        config: DenseProfileConfig | None = None,
+    ) -> "DenseUserProfiles":
+        """Build recency-weighted profiles from chronological interactions.
+
+        Only the latest event for each user-item pair contributes. Events for
+        products outside the supplied item index are ignored.
+
+        Args:
+            item_index: Indexed products and normalized dense vectors.
+            interactions: Events containing user_id, item_id, and timestamp.
+            config: Optional recency-weighting configuration.
+
+        Returns:
+            Aligned user profiles and a sparse observed-item matrix.
+
+        Raises:
+            ValueError: If inputs are invalid or no events match the index.
+        """
+        config = config or DenseProfileConfig()
+        required = {"user_id", "item_id", "timestamp"}
+        missing = required - set(interactions.columns)
+
+        if missing:
+            raise ValueError(
+                f"Missing interaction columns: {sorted(missing)}"
+            )
+        if not 0 < config.recency_decay <= 1:
+            raise ValueError(
+                "recency_decay must be between zero and one."
+            )
+
+        events = interactions[
+            ["user_id", "item_id", "timestamp"]
+        ].copy()
+
+        events["timestamp"] = pd.to_numeric(
+            events["timestamp"],
+            errors="coerce",
+        )
+        events = events.dropna(
+            subset=["user_id", "item_id", "timestamp"]
+        )
+
+        events["user_id"] = events["user_id"].astype(str)
+        events["item_id"] = events["item_id"].astype(str)
+
+        events = events.loc[
+            events["item_id"].isin(item_index.item_to_index)
+        ]
+
+        events = (
+            events.sort_values(
+                ["user_id", "timestamp", "item_id"],
+                ascending=[True, False, True],
+            )
+            .drop_duplicates(
+                ["user_id", "item_id"],
+                keep="first",
+            )
+            .reset_index(drop=True)
+        )
+
+        if events.empty:
+            raise ValueError(
+                "No interactions match the dense item index."
+            )
+
+        events["recency_position"] = (
+            events.groupby("user_id").cumcount()
+        )
+
+        weights = np.power(
+            config.recency_decay,
+            events["recency_position"].to_numpy(),
+        ).astype(np.float32)
+
+        user_ids = np.sort(events["user_id"].unique())
+
+        user_indices = pd.Categorical(
+            events["user_id"],
+            categories=user_ids,
+        ).codes
+
+        item_indices = (
+            events["item_id"]
+            .map(item_index.item_to_index)
+            .to_numpy()
+        )
+
+        user_items = csr_matrix(
+            (
+                weights,
+                (user_indices, item_indices),
+            ),
+            shape=(len(user_ids), len(item_index.item_ids)),
+            dtype=np.float32,
+        )
+
+        user_profiles = np.asarray(
+            user_items @ item_index.item_vectors,
+            dtype=np.float32,
+        )
+
+        if np.any(np.linalg.norm(user_profiles, axis=1) == 0):
+            raise ValueError(
+                "Recency weighting produced a zero user profile."
+            )
+
+        user_profiles = np.ascontiguousarray(user_profiles)
+        faiss.normalize_L2(user_profiles)
+
+        return cls(
+            item_index=item_index,
+            user_ids=user_ids,
+            user_profiles=user_profiles,
+            user_items=user_items,
+            config=config,
+        )
+
+    def indices_for(
+        self,
+        user_ids: Iterable[str],
+    ) -> np.ndarray:
+        """Resolve known user IDs into profile row positions."""
+        requested = list(map(str, user_ids))
+        unknown = [
+            user_id
+            for user_id in requested
+            if user_id not in self.user_to_index
+        ]
+
+        if unknown:
+            raise ValueError(f"Unknown users: {unknown[:5]}")
+
+        return np.asarray(
+            [self.user_to_index[user_id] for user_id in requested],
+            dtype=np.int32,
+        )

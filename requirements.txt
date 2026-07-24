@@ -9,3 +9,4 @@ implicit==0.7.3
 threadpoolctl
 joblib
 tiktoken
+faiss-cpu==1.14.3
