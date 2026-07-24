@@ -1,7 +1,11 @@
 """Build recency-weighted user profiles from dense product vectors."""
 
 from collections.abc import Iterable
-from dataclasses import dataclass
+import json
+from dataclasses import asdict, dataclass
+from pathlib import Path
+
+from scipy.sparse import csr_matrix, save_npz
 
 import faiss
 import numpy as np
@@ -187,3 +191,42 @@ class DenseUserProfiles:
             [self.user_to_index[user_id] for user_id in requested],
             dtype=np.int32,
         )
+        
+    def save(self, directory: str | Path) -> None:
+        """Persist dense profiles, observed items, users, and configuration.
+
+        Args:
+            directory: Model artifact directory to create or update.
+        """
+        directory = Path(directory)
+        directory.mkdir(parents=True, exist_ok=True)
+
+        np.save(
+            directory / "user_profiles.npy",
+            self.user_profiles,
+            allow_pickle=False,
+        )
+
+        save_npz(
+            directory / "user_items.npz",
+            self.user_items,
+        )
+
+        pd.DataFrame(
+            {
+                "user_index": np.arange(
+                    len(self.user_ids),
+                    dtype=np.int32,
+                ),
+                "user_id": self.user_ids,
+            }
+        ).to_parquet(
+            directory / "users.parquet",
+            index=False,
+        )
+
+        with (directory / "profile_config.json").open(
+            "w",
+            encoding="utf-8",
+        ) as output:
+            json.dump(asdict(self.config), output, indent=2)

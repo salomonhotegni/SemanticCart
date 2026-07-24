@@ -1,7 +1,9 @@
 import numpy as np
 import pandas as pd
 import pytest
+import json
 
+from scipy.sparse import load_npz
 from semanticcart.dense_index import DenseItemIndex, HnswConfig
 from semanticcart.dense_profiles import (
     DenseProfileConfig,
@@ -145,3 +147,45 @@ def test_rejects_zero_user_profiles():
             interactions,
             DenseProfileConfig(recency_decay=1.0),
         )
+        
+    
+def test_dense_profile_artifacts_are_readable(
+    user_profiles,
+    tmp_path,
+):
+    user_profiles.save(tmp_path)
+
+    assert {
+        path.name for path in tmp_path.iterdir()
+    } == {
+        "user_profiles.npy",
+        "user_items.npz",
+        "users.parquet",
+        "profile_config.json",
+    }
+
+    saved_profiles = np.load(
+        tmp_path / "user_profiles.npy",
+        allow_pickle=False,
+    )
+    saved_items = load_npz(
+        tmp_path / "user_items.npz"
+    )
+    saved_users = pd.read_parquet(
+        tmp_path / "users.parquet"
+    )
+    saved_config = json.loads(
+        (tmp_path / "profile_config.json").read_text()
+    )
+
+    assert np.allclose(
+        saved_profiles,
+        user_profiles.user_profiles,
+    )
+    assert (
+        saved_items != user_profiles.user_items
+    ).nnz == 0
+    assert saved_users["user_id"].tolist() == (
+        user_profiles.user_ids.tolist()
+    )
+    assert saved_config["recency_decay"] == pytest.approx(0.1)

@@ -1,6 +1,9 @@
 import numpy as np
 import pandas as pd
 import pytest
+import json
+
+import faiss
 
 from semanticcart.dense_index import DenseItemIndex, HnswConfig
 
@@ -114,3 +117,43 @@ def test_rejects_incompatible_query_dimensions(dense_index):
             np.array([1.0, 0.0, 0.0]),
             k=1,
         )
+        
+        
+def test_dense_index_artifacts_are_readable(
+    dense_index,
+    tmp_path,
+):
+    dense_index.save(tmp_path)
+
+    assert {
+        path.name for path in tmp_path.iterdir()
+    } == {
+        "item_index.faiss",
+        "item_vectors.npy",
+        "items.parquet",
+        "index_config.json",
+    }
+
+    saved_index = faiss.read_index(
+        str(tmp_path / "item_index.faiss")
+    )
+    saved_vectors = np.load(
+        tmp_path / "item_vectors.npy",
+        allow_pickle=False,
+    )
+    saved_items = pd.read_parquet(
+        tmp_path / "items.parquet"
+    )
+    saved_config = json.loads(
+        (tmp_path / "index_config.json").read_text()
+    )
+
+    assert saved_index.ntotal == len(dense_index.item_ids)
+    assert np.allclose(
+        saved_vectors,
+        dense_index.item_vectors,
+    )
+    assert saved_items["item_id"].tolist() == (
+        dense_index.item_ids.tolist()
+    )
+    assert saved_config["connections"] == 8

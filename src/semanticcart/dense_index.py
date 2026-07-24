@@ -1,6 +1,8 @@
 """Build and query a FAISS index for dense product embeddings."""
 
-from dataclasses import dataclass
+import json
+from dataclasses import asdict, dataclass
+from pathlib import Path
 
 import faiss
 import numpy as np
@@ -166,3 +168,42 @@ class DenseItemIndex:
             result_count,
         )
         return scores, indices
+    
+    def save(self, directory: str | Path) -> None:
+        """Persist the FAISS index, vectors, item mapping, and configuration.
+
+        Args:
+            directory: Model artifact directory to create or update.
+        """
+        directory = Path(directory)
+        directory.mkdir(parents=True, exist_ok=True)
+
+        faiss.write_index(
+            self.index,
+            str(directory / "item_index.faiss"),
+        )
+
+        np.save(
+            directory / "item_vectors.npy",
+            self.item_vectors,
+            allow_pickle=False,
+        )
+
+        pd.DataFrame(
+            {
+                "item_index": np.arange(
+                    len(self.item_ids),
+                    dtype=np.int32,
+                ),
+                "item_id": self.item_ids,
+            }
+        ).to_parquet(
+            directory / "items.parquet",
+            index=False,
+        )
+
+        with (directory / "index_config.json").open(
+            "w",
+            encoding="utf-8",
+        ) as output:
+            json.dump(asdict(self.config), output, indent=2)
