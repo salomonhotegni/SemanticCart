@@ -1,0 +1,43 @@
+{
+  "dataset": "video_games_5core",
+  "model": "openai_hnsw_content",
+  "retrieval": "faiss_hnsw",
+  "k": 10,
+  "embedding_config": {
+    "model": "text-embedding-3-small",
+    "dimensions": 512
+  },
+  "index_config": {
+    "connections": 32,
+    "ef_construction": 200,
+    "ef_search": 128
+  },
+  "profile_config": {
+    "recency_decay": 0.85
+  },
+  "retrieval_config": {
+    "batch_size": 512,
+    "candidate_multiplier": 10
+  },
+  "train_interactions": 625062,
+  "validation_interactions": 94762,
+  "train_users": 94762,
+  "train_items": 25527,
+  "unique_embedding_texts": 25349,
+  "evaluated_users": 94762,
+  "recommendation_rows": 947620,
+  "cold_user_rate": 0.0,
+  "unseen_item_event_rate": 0.0017200987737700766,
+  "embedding_load_seconds": 0.8806369040103164,
+  "index_build_seconds": 1.3511912529938854,
+  "profile_build_seconds": 1.0157804529881105,
+  "recommendation_seconds": 11.539936624991242,
+  "recommendation_users_per_second": 8211.656881614106,
+  "embedding_cache_bytes": 26068766,
+  "faiss_index_bytes": 59225590,
+  "model_artifact_bytes": 311146250,
+  "recall_at_k": 0.033884890567949175,
+  "ndcg_at_k": 0.01750338122551296,
+  "mrr_at_k": 0.012567659060979168,
+  "catalog_coverage": 0.8794217886943236
+}
