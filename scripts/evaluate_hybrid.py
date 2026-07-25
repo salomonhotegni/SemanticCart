@@ -4,6 +4,7 @@ import json
 from dataclasses import asdict
 from pathlib import Path
 from time import perf_counter
+import argparse
 
 from math import isclose
 
@@ -13,6 +14,7 @@ from semanticcart.evaluation import evaluate_ranking
 from semanticcart.hybrid import (
     HybridConfig,
     rank_hybrid_candidates,
+    rerank_collaborative_candidates,
 )
 
 
@@ -37,10 +39,16 @@ SEMANTIC_RESULTS_PATH = (
     Path("results")
     / f"{DATASET}_openai_semantic.json"
 )
-TUNING_RESULTS_PATH = (
-    Path("results")
-    / f"{DATASET}_hybrid_tuning.json"
-)
+TUNING_RESULTS_PATHS = {
+    "union": (
+        Path("results")
+        / f"{DATASET}_hybrid_union_tuning.json"
+    ),
+    "conservative": (
+        Path("results")
+        / f"{DATASET}_hybrid_conservative_tuning.json"
+    ),
+}
 BEST_RESULTS_PATH = (
     Path("results")
     / f"{DATASET}_hybrid.json"
@@ -107,11 +115,21 @@ def evaluate_alpha(
     validation: pd.DataFrame,
     catalog_size: int,
     alpha: float,
+    strategy: str = "union",
 ) -> tuple[pd.DataFrame, dict]:
     """Rank and evaluate one semantic blending weight."""
     start = perf_counter()
 
-    recommendations = rank_hybrid_candidates(
+    if strategy == "union":
+        ranking_function = rank_hybrid_candidates
+    elif strategy == "conservative":
+        ranking_function = rerank_collaborative_candidates
+    else:
+        raise ValueError(
+            f"Unsupported hybrid strategy: {strategy}"
+        )
+
+    recommendations = ranking_function(
         collaborative,
         semantic,
         HybridConfig(
@@ -130,6 +148,7 @@ def evaluate_alpha(
     )
 
     record = {
+        "strategy": strategy,
         "semantic_weight": alpha,
         "ranking_seconds": ranking_seconds,
         "recommendation_rows": len(recommendations),
@@ -137,6 +156,7 @@ def evaluate_alpha(
     }
 
     print(
+        f"strategy={strategy} "
         f"alpha={alpha:.1f} "
         f"Recall@{K}={metrics.recall_at_k:.6f} "
         f"NDCG@{K}={metrics.ndcg_at_k:.6f} "
@@ -175,6 +195,20 @@ def verify_endpoint(
             )
 
 
+def parse_args() -> argparse.Namespace:
+    """Parse the hybrid candidate strategy."""
+    parser = argparse.ArgumentParser(
+        description="Tune ALS and semantic hybrid ranking."
+    )
+    parser.add_argument(
+        "--strategy",
+        choices=["union", "conservative"],
+        default="conservative",
+        help="Candidate blending policy.",
+    )
+    return parser.parse_args()
+
+
 def main() -> None:
     """Sweep alpha, select validation NDCG, and save hybrid results."""
     (
@@ -186,6 +220,10 @@ def main() -> None:
         als_results,
         semantic_results,
     ) = load_inputs()
+    
+    args = parse_args()
+    strategy = args.strategy
+    tuning_results_path = TUNING_RESULTS_PATHS[strategy]
 
     if collaborative["rank"].max() != K:
         raise ValueError(
@@ -196,6 +234,7 @@ def main() -> None:
             f"Expected semantic candidate depth {K}."
         )
 
+    print(f"Strategy:            {strategy}")
     print(f"ALS candidates:      {len(collaborative):,}")
     print(f"Semantic candidates: {len(semantic):,}")
     print(f"Alpha values:        {len(ALPHA_GRID)}")
@@ -210,6 +249,7 @@ def main() -> None:
             validation=validation,
             catalog_size=catalog_size,
             alpha=alpha,
+            strategy=strategy,
         )
 
         tuning_records.append(record)
@@ -220,22 +260,23 @@ def main() -> None:
         for record in tuning_records
         if record["semantic_weight"] == 0.0
     )
-    semantic_endpoint = next(
-        record
-        for record in tuning_records
-        if record["semantic_weight"] == 1.0
-    )
-
     verify_endpoint(
         als_endpoint,
         als_results,
         "ALS",
     )
-    verify_endpoint(
-        semantic_endpoint,
-        semantic_results,
-        "OpenAI semantic",
-    )
+    if strategy == "union":
+        semantic_endpoint = next(
+            record
+            for record in tuning_records
+            if record["semantic_weight"] == 1.0
+        )
+
+        verify_endpoint(
+            semantic_endpoint,
+            semantic_results,
+            "OpenAI semantic",
+        )
 
     best_record = max(
         tuning_records,
@@ -258,6 +299,7 @@ def main() -> None:
         validation=validation,
         catalog_size=catalog_size,
         alpha=best_alpha,
+        strategy=strategy,
     )
 
     train_users = pd.Index(train["user_id"].unique())
@@ -304,6 +346,7 @@ def main() -> None:
             for record in tuning_records
         ),
         "trials": tuning_records,
+        "strategy": strategy,
     }
 
     best_results = {
@@ -323,6 +366,7 @@ def main() -> None:
         "cold_user_rate": cold_user_rate,
         "unseen_item_event_rate": unseen_item_event_rate,
         "source_metrics": source_metrics,
+        "strategy": strategy,
         **final_record,
     }
 
@@ -341,7 +385,7 @@ def main() -> None:
         index=False,
     )
 
-    with TUNING_RESULTS_PATH.open(
+    with tuning_results_path.open(
         "w",
         encoding="utf-8",
     ) as output:
@@ -371,7 +415,8 @@ def main() -> None:
         f"Coverage:      "
         f"{final_record['catalog_coverage']:.6f}"
     )
-    print(f"Tuning:        {TUNING_RESULTS_PATH}")
+    print(f"Strategy:      {strategy}")
+    print(f"Tuning:        {tuning_results_path}")
     print(f"Best result:   {BEST_RESULTS_PATH}")
 
 

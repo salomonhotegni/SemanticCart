@@ -205,3 +205,91 @@ def rank_hybrid_candidates(
     ]
 
     return candidates[RESULT_COLUMNS].reset_index(drop=True)
+
+
+def rerank_collaborative_candidates(
+    collaborative: pd.DataFrame,
+    semantic: pd.DataFrame,
+    config: HybridConfig | None = None,
+) -> pd.DataFrame:
+    """Use semantic agreement to reorder only ALS candidates.
+
+    Unlike union blending, this strategy never injects semantic-only products.
+    Therefore, when output depth equals ALS candidate depth, Recall@K, coverage,
+    and the candidate set remain unchanged; only ranking positions can change.
+
+    Args:
+        collaborative: ALS candidates with collaborative_score.
+        semantic: Semantic candidates used as an agreement signal.
+        config: Semantic blend weight and output size.
+
+    Returns:
+        Reranked ALS candidates with collaborative and semantic components.
+
+    Raises:
+        ValueError: If configuration or candidate data is invalid.
+    """
+    config = config or HybridConfig()
+
+    if not 0 <= config.semantic_weight <= 1:
+        raise ValueError(
+            "semantic_weight must be between zero and one."
+        )
+    if config.k <= 0:
+        raise ValueError("k must be greater than zero.")
+
+    collaborative_prepared = _prepare_candidates(
+        collaborative,
+        score_column="collaborative_score",
+        prefix="collaborative",
+    )
+    semantic_prepared = _prepare_candidates(
+        semantic,
+        score_column="semantic_score",
+        prefix="semantic",
+    )
+
+    candidates = collaborative_prepared.merge(
+        semantic_prepared,
+        on=["user_id", "item_id"],
+        how="left",
+        validate="one_to_one",
+    )
+
+    if candidates.empty:
+        return pd.DataFrame(columns=RESULT_COLUMNS)
+
+    candidates["semantic_normalized"] = candidates[
+        "semantic_normalized"
+    ].fillna(0.0)
+
+    candidates["hybrid_score"] = (
+        (1.0 - config.semantic_weight)
+        * candidates["collaborative_normalized"]
+        + config.semantic_weight
+        * candidates["semantic_normalized"]
+    )
+
+    candidates["_semantic_order"] = candidates[
+        "semantic_rank"
+    ].fillna(np.inf)
+
+    candidates = candidates.sort_values(
+        [
+            "user_id",
+            "hybrid_score",
+            "collaborative_rank",
+            "_semantic_order",
+            "item_id",
+        ],
+        ascending=[True, False, True, True, True],
+    )
+
+    candidates["rank"] = (
+        candidates.groupby("user_id").cumcount() + 1
+    )
+    candidates = candidates.loc[
+        candidates["rank"] <= config.k
+    ]
+
+    return candidates[RESULT_COLUMNS].reset_index(drop=True)

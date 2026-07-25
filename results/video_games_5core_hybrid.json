@@ -1,0 +1,38 @@
+{
+  "dataset": "video_games_5core",
+  "model": "normalized_als_openai_hybrid",
+  "k": 10,
+  "semantic_weight": 0.6,
+  "candidate_depth_per_model": 10,
+  "selection_split": "validation",
+  "selection_metric": "ndcg_at_k",
+  "train_interactions": 625062,
+  "validation_interactions": 94762,
+  "train_users": 94762,
+  "train_items": 25527,
+  "als_candidate_rows": 947620,
+  "semantic_candidate_rows": 947620,
+  "cold_user_rate": 0.0,
+  "unseen_item_event_rate": 0.0017200987737700766,
+  "source_metrics": {
+    "als": {
+      "recall_at_k": 0.08135117452143265,
+      "ndcg_at_k": 0.04350510760412205,
+      "mrr_at_k": 0.03204451134554973,
+      "catalog_coverage": 0.07866180906491166
+    },
+    "openai_semantic": {
+      "recall_at_k": 0.033884890567949175,
+      "ndcg_at_k": 0.01750338122551296,
+      "mrr_at_k": 0.012567659060979168,
+      "catalog_coverage": 0.8794217886943236
+    }
+  },
+  "strategy": "conservative",
+  "ranking_seconds": 1.5568057430209592,
+  "recommendation_rows": 947620,
+  "recall_at_k": 0.08135117452143265,
+  "ndcg_at_k": 0.04385355175514494,
+  "mrr_at_k": 0.0324706164449416,
+  "catalog_coverage": 0.07866180906491166
+}

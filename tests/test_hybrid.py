@@ -6,6 +6,7 @@ from semanticcart.hybrid import (
     HybridConfig,
     RESULT_COLUMNS,
     rank_hybrid_candidates,
+    rerank_collaborative_candidates,
 )
 
 
@@ -194,3 +195,72 @@ def test_rejects_non_finite_scores(candidate_lists):
             collaborative,
             semantic,
         )
+        
+        
+@pytest.mark.parametrize(
+    "semantic_weight",
+    [0.0, 0.3, 0.6, 1.0],
+)
+def test_conservative_reranking_preserves_als_candidates(
+    candidate_lists,
+    semantic_weight,
+):
+    collaborative, semantic = candidate_lists
+
+    recommendations = rerank_collaborative_candidates(
+        collaborative,
+        semantic,
+        HybridConfig(
+            semantic_weight=semantic_weight,
+            k=3,
+        ),
+    )
+
+    assert set(recommendations["item_id"]) == {"a", "b", "c"}
+    assert "d" not in recommendations["item_id"].tolist()
+    assert recommendations["rank"].tolist() == [1, 2, 3]
+
+
+def test_conservative_zero_weight_reproduces_als_order(
+    candidate_lists,
+):
+    collaborative, semantic = candidate_lists
+
+    recommendations = rerank_collaborative_candidates(
+        collaborative,
+        semantic,
+        HybridConfig(semantic_weight=0.0, k=3),
+    )
+
+    assert recommendations["item_id"].tolist() == ["a", "b", "c"]
+
+
+def test_conservative_agreement_can_improve_rank(
+    candidate_lists,
+):
+    collaborative, semantic = candidate_lists
+
+    recommendations = rerank_collaborative_candidates(
+        collaborative,
+        semantic,
+        HybridConfig(semantic_weight=0.5, k=3),
+    )
+
+    assert recommendations.iloc[0]["item_id"] == "b"
+    assert recommendations.iloc[0]["hybrid_score"] == pytest.approx(
+        0.55
+    )
+
+
+def test_conservative_empty_candidates_keep_schema(
+    candidate_lists,
+):
+    collaborative, semantic = candidate_lists
+
+    recommendations = rerank_collaborative_candidates(
+        collaborative.iloc[0:0],
+        semantic,
+    )
+
+    assert recommendations.empty
+    assert recommendations.columns.tolist() == RESULT_COLUMNS

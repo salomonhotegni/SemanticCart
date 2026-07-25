@@ -1,0 +1,148 @@
+{
+  "dataset": "video_games_5core",
+  "model": "normalized_als_openai_hybrid",
+  "candidate_depth_per_model": 10,
+  "selection_split": "validation",
+  "selection_metric": "ndcg_at_k",
+  "alpha_grid": [
+    0.0,
+    0.1,
+    0.2,
+    0.3,
+    0.4,
+    0.5,
+    0.6,
+    0.7,
+    0.8,
+    0.9,
+    1.0
+  ],
+  "source_metrics": {
+    "als": {
+      "recall_at_k": 0.08135117452143265,
+      "ndcg_at_k": 0.04350510760412205,
+      "mrr_at_k": 0.03204451134554973,
+      "catalog_coverage": 0.07866180906491166
+    },
+    "openai_semantic": {
+      "recall_at_k": 0.033884890567949175,
+      "ndcg_at_k": 0.01750338122551296,
+      "mrr_at_k": 0.012567659060979168,
+      "catalog_coverage": 0.8794217886943236
+    }
+  },
+  "tuning_seconds": 30.85285745211877,
+  "trials": [
+    {
+      "strategy": "union",
+      "semantic_weight": 0.0,
+      "ranking_seconds": 3.0097230820101686,
+      "recommendation_rows": 947620,
+      "recall_at_k": 0.08135117452143265,
+      "ndcg_at_k": 0.04350510760412205,
+      "mrr_at_k": 0.03204451134554973,
+      "catalog_coverage": 0.07866180906491166
+    },
+    {
+      "strategy": "union",
+      "semantic_weight": 0.1,
+      "ranking_seconds": 2.7175842769793235,
+      "recommendation_rows": 947620,
+      "recall_at_k": 0.07964162850087587,
+      "ndcg_at_k": 0.04300375461327176,
+      "mrr_at_k": 0.031878326420442464,
+      "catalog_coverage": 0.6744623339992949
+    },
+    {
+      "strategy": "union",
+      "semantic_weight": 0.2,
+      "ranking_seconds": 2.7830938849947415,
+      "recommendation_rows": 947620,
+      "recall_at_k": 0.07749941959857327,
+      "ndcg_at_k": 0.042286890385391275,
+      "mrr_at_k": 0.0315710696103153,
+      "catalog_coverage": 0.7269165981118032
+    },
+    {
+      "strategy": "union",
+      "semantic_weight": 0.3,
+      "ranking_seconds": 2.6529272490297444,
+      "recommendation_rows": 947620,
+      "recall_at_k": 0.07553660750089698,
+      "ndcg_at_k": 0.04145809321751662,
+      "mrr_at_k": 0.031101204085892037,
+      "catalog_coverage": 0.7592353194656638
+    },
+    {
+      "strategy": "union",
+      "semantic_weight": 0.4,
+      "ranking_seconds": 3.002487118006684,
+      "recommendation_rows": 947620,
+      "recall_at_k": 0.07330997657288786,
+      "ndcg_at_k": 0.04014185681607774,
+      "mrr_at_k": 0.030109877611513288,
+      "catalog_coverage": 0.7805852626630626
+    },
+    {
+      "strategy": "union",
+      "semantic_weight": 0.5,
+      "ranking_seconds": 2.773089967027772,
+      "recommendation_rows": 947620,
+      "recall_at_k": 0.07132605896878495,
+      "ndcg_at_k": 0.03515357696615929,
+      "mrr_at_k": 0.024171215238309642,
+      "catalog_coverage": 0.7996631018137658
+    },
+    {
+      "strategy": "union",
+      "semantic_weight": 0.6,
+      "ranking_seconds": 2.791614397021476,
+      "recommendation_rows": 947620,
+      "recall_at_k": 0.06840294632869716,
+      "ndcg_at_k": 0.032091725522069306,
+      "mrr_at_k": 0.02118886061421044,
+      "catalog_coverage": 0.8138049907940612
+    },
+    {
+      "strategy": "union",
+      "semantic_weight": 0.7,
+      "ranking_seconds": 2.867837934056297,
+      "recommendation_rows": 947620,
+      "recall_at_k": 0.06538485890968954,
+      "ndcg_at_k": 0.029529960564165958,
+      "mrr_at_k": 0.018908163576385015,
+      "catalog_coverage": 0.8270066987895169
+    },
+    {
+      "strategy": "union",
+      "semantic_weight": 0.8,
+      "ranking_seconds": 2.9790747049846686,
+      "recommendation_rows": 947620,
+      "recall_at_k": 0.06155420949325679,
+      "ndcg_at_k": 0.027082779195440932,
+      "mrr_at_k": 0.017014551576665083,
+      "catalog_coverage": 0.8400517099541662
+    },
+    {
+      "strategy": "union",
+      "semantic_weight": 0.9,
+      "ranking_seconds": 2.6752237220061943,
+      "recommendation_rows": 947620,
+      "recall_at_k": 0.055549692914881495,
+      "ndcg_at_k": 0.024397076286941235,
+      "mrr_at_k": 0.015391538132457487,
+      "catalog_coverage": 0.8541935989344616
+    },
+    {
+      "strategy": "union",
+      "semantic_weight": 1.0,
+      "ranking_seconds": 2.600201116001699,
+      "recommendation_rows": 947620,
+      "recall_at_k": 0.033884890567949175,
+      "ndcg_at_k": 0.01750338122551296,
+      "mrr_at_k": 0.012567659060979168,
+      "catalog_coverage": 0.8794217886943236
+    }
+  ],
+  "strategy": "union"
+}
