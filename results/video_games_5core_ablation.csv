@@ -1,0 +1,6 @@
+model,recall_at_10,ndcg_at_10,mrr_at_10,catalog_coverage,timing_scope,stage_seconds,stage_users_per_second,notes,result_path
+Popularity,0.02678288765538929,0.013567916275189081,0.00966264941777278,0.0007834841540329847,not recorded,,,Global Top-K,results/video_games_5core_popularity.json
+TF-IDF content,0.030740170110381798,0.015560417896503203,0.011016458777428365,0.8881576370117914,candidate generation,151.62189107600716,624.9889071261904,"50,000-feature sparse retrieval",results/video_games_5core_tfidf.json
+OpenAI content,0.033884890567949175,0.01750338122551296,0.012567659060979168,0.8794217886943236,candidate generation,11.539936624991242,8211.656881614106,512d embeddings with FAISS HNSW,results/video_games_5core_openai_semantic.json
+Collaborative ALS,0.08135117452143265,0.04350510760412205,0.03204451134554973,0.07866180906491166,candidate generation,13.568094333008048,6984.179036068896,64 latent factors,results/video_games_5core_als.json
+Hybrid,0.08135117452143265,0.04385355175514494,0.0324706164449416,0.07866180906491166,reranking only,1.5568057430209592,60869.50823814132,ALS Top-10 reranked; semantic weight 0.6,results/video_games_5core_hybrid.json
