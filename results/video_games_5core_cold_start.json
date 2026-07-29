@@ -1,0 +1,132 @@
+{
+  "dataset": "video_games_5core",
+  "model": "openai_hnsw_cold_start",
+  "evaluation_split": "test",
+  "fit_splits": [
+    "train",
+    "validation"
+  ],
+  "test_used_for_tuning": false,
+  "candidate_catalog_scope": "full_catalogue",
+  "k": 10,
+  "embedding_config": {
+    "model": "text-embedding-3-small",
+    "dimensions": 512,
+    "batch_size": 64
+  },
+  "index_config": {
+    "connections": 32,
+    "ef_construction": 200,
+    "ef_search": 128
+  },
+  "profile_config": {
+    "recency_decay": 0.85
+  },
+  "retrieval_config": {
+    "batch_size": 512,
+    "candidate_multiplier": 10
+  },
+  "fit_interactions": 719824,
+  "fit_users": 94762,
+  "fit_items": 25600,
+  "catalogue_items": 25612,
+  "catalogue_only_items": 12,
+  "unique_embedding_texts": 25434,
+  "embedding_load_seconds": 0.6166905749996658,
+  "index_build_seconds": 7.16382224300105,
+  "cold_item": {
+    "cohort_events": 69,
+    "cohort_users": 69,
+    "cohort_items": 12,
+    "hit_count_at_k": 4,
+    "recall_at_k_wilson_95_low": 0.022772020303367495,
+    "recall_at_k_wilson_95_high": 0.13979442524423166,
+    "catalogue_only_recommendation_rows": 4,
+    "catalogue_only_items_recommended": 3,
+    "catalogue_only_item_exposure": 0.25,
+    "als_representable_cold_items": 0,
+    "profile_build_seconds": 0.9567679170013434,
+    "recommendation_seconds": 0.0344498440008465,
+    "recommendation_users_per_second": 2002.9118273599306,
+    "recall_at_k": 0.057971014492753624,
+    "ndcg_at_k": 0.04139430705953655,
+    "mrr_at_k": 0.036231884057971016,
+    "catalog_coverage": 0.022957988442917382
+  },
+  "simulated_new_user_sessions": {
+    "1": {
+      "session_length": 1,
+      "eligible_users": 94762,
+      "session_interactions": 94762,
+      "evaluation_events": 94762,
+      "profile_build_seconds": 0.41659082300066075,
+      "recommendation_seconds": 6.64953585100011,
+      "recommendation_users_per_second": 14250.919481206725,
+      "recall_at_k": 0.03289293176589772,
+      "ndcg_at_k": 0.01779652677844007,
+      "mrr_at_k": 0.013204865288242591,
+      "catalog_coverage": 0.9542401999062939
+    },
+    "3": {
+      "session_length": 3,
+      "eligible_users": 94762,
+      "session_interactions": 284286,
+      "evaluation_events": 94762,
+      "profile_build_seconds": 0.5444787220003491,
+      "recommendation_seconds": 6.691181039999719,
+      "recommendation_users_per_second": 14162.22329563571,
+      "recall_at_k": 0.032470821637365185,
+      "ndcg_at_k": 0.016912680275708407,
+      "mrr_at_k": 0.012227207141835368,
+      "catalog_coverage": 0.915313134468218
+    },
+    "5": {
+      "session_length": 5,
+      "eligible_users": 64311,
+      "session_interactions": 321555,
+      "evaluation_events": 64311,
+      "profile_build_seconds": 0.4357353569994302,
+      "recommendation_seconds": 4.598464695000075,
+      "recommendation_users_per_second": 13985.319941659125,
+      "recall_at_k": 0.029746077653900575,
+      "ndcg_at_k": 0.015719647632992415,
+      "mrr_at_k": 0.011481021168710677,
+      "catalog_coverage": 0.8233250039044198
+    }
+  },
+  "controlled_common_session_cohort": {
+    "required_history_length": 5,
+    "eligible_users": 64311,
+    "results": {
+      "1": {
+        "session_length": 1,
+        "eligible_users": 64311,
+        "evaluation_events": 64311,
+        "recall_at_k": 0.03259162507191616,
+        "ndcg_at_k": 0.017577720095873745,
+        "mrr_at_k": 0.013009531065928883,
+        "catalog_coverage": 0.9405356863970014
+      },
+      "3": {
+        "session_length": 3,
+        "eligible_users": 64311,
+        "evaluation_events": 64311,
+        "recall_at_k": 0.032094043009749496,
+        "ndcg_at_k": 0.01666200219742515,
+        "mrr_at_k": 0.01201356478797352,
+        "catalog_coverage": 0.8911057316882711
+      },
+      "5": {
+        "session_length": 5,
+        "eligible_users": 64311,
+        "evaluation_events": 64311,
+        "recall_at_k": 0.029746077653900575,
+        "ndcg_at_k": 0.015719647632992415,
+        "mrr_at_k": 0.011481021168710677,
+        "catalog_coverage": 0.8233250039044198
+      }
+    }
+  },
+  "faiss_build_threads": 1,
+  "faiss_search_threads": 22
+}
