@@ -1,0 +1,4 @@
+model,recall_at_10,ndcg_at_10,mrr_at_10,catalog_coverage,timing_scope,stage_seconds,stage_users_per_second,notes,result_path
+Collaborative ALS,0.07103058187881219,0.03880224582503038,0.02904055707816709,0.078828125,candidate generation,10.766968108000583,8801.17773633837,64 latent factors,results/video_games_5core_als_test.json
+OpenAI content,0.02948439247799751,0.015465697791347991,0.011237660397661242,0.8482421875,candidate generation,9.04918549499962,10471.881701658496,512d embeddings with FAISS HNSW,results/video_games_5core_openai_semantic_test.json
+Hybrid,0.07103058187881219,0.038932654718881604,0.029193232804121134,0.078828125,reranking only,1.7231241520003096,54994.29619740074,ALS Top-10 reranked; semantic weight 0.6,results/video_games_5core_hybrid_test.json
