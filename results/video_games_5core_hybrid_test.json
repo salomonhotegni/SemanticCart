@@ -1,0 +1,53 @@
+{
+  "dataset": "video_games_5core",
+  "model": "normalized_als_openai_hybrid",
+  "strategy": "conservative",
+  "evaluation_split": "test",
+  "fit_splits": [
+    "train",
+    "validation"
+  ],
+  "selection_split": "validation",
+  "selection_metric": "ndcg_at_k",
+  "semantic_weight": 0.6,
+  "test_used_for_tuning": false,
+  "k": 10,
+  "candidate_depth_per_model": 10,
+  "fit_interactions": 719824,
+  "test_interactions": 94762,
+  "fit_users": 94762,
+  "fit_items": 25600,
+  "evaluated_users": 94762,
+  "als_candidate_rows": 947620,
+  "semantic_candidate_rows": 947620,
+  "candidate_overlap_rows": 32514,
+  "users_with_candidate_overlap": 23912,
+  "recommendation_rows": 947620,
+  "cold_user_rate": 0.0,
+  "unseen_item_event_rate": 0.0007281399717186214,
+  "ranking_seconds": 1.7231241520003096,
+  "source_metrics": {
+    "als": {
+      "recall_at_k": 0.07103058187881219,
+      "ndcg_at_k": 0.03880224582503038,
+      "mrr_at_k": 0.02904055707816709,
+      "catalog_coverage": 0.078828125
+    },
+    "openai_semantic": {
+      "recall_at_k": 0.02948439247799751,
+      "ndcg_at_k": 0.015465697791347991,
+      "mrr_at_k": 0.011237660397661242,
+      "catalog_coverage": 0.8482421875
+    }
+  },
+  "delta_vs_als": {
+    "recall_at_k": 0.0,
+    "ndcg_at_k": 0.00013040889385122073,
+    "mrr_at_k": 0.00015267572595404483,
+    "catalog_coverage": 0.0
+  },
+  "recall_at_k": 0.07103058187881219,
+  "ndcg_at_k": 0.038932654718881604,
+  "mrr_at_k": 0.029193232804121134,
+  "catalog_coverage": 0.078828125
+}
