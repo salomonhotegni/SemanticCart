@@ -1,4 +1,4 @@
-"""Prepare OpenAI Batch API requests for a selected fitting horizon."""
+"""Prepare cache-aware embeddings for a selected catalogue scope."""
 
 import argparse
 from pathlib import Path
@@ -30,6 +30,14 @@ def parse_args() -> argparse.Namespace:
         default="train",
         help=(
             "Use train only, or train plus validation for the final refit."
+        ),
+    )
+    parser.add_argument(
+        "--include-catalog-only-products",
+        action="store_true",
+        help=(
+            "Embed all catalogue products, including products with no "
+            "interactions through the selected fitting horizon."
         ),
     )
     return parser.parse_args()
@@ -64,12 +72,12 @@ def main() -> None:
         fit_events["item_id"].astype(str).unique()
     )
 
-    fit_catalog = catalog.loc[
+    observed_catalog = catalog.loc[
         catalog["item_id"].astype(str).isin(fit_item_ids)
     ].copy()
 
     missing_metadata = fit_item_ids.difference(
-        pd.Index(fit_catalog["item_id"].astype(str))
+        pd.Index(observed_catalog["item_id"].astype(str))
     )
 
     if len(missing_metadata):
@@ -77,6 +85,13 @@ def main() -> None:
             f"Missing metadata for {len(missing_metadata)} "
             "fit products."
         )
+
+    if args.include_catalog_only_products:
+        embedding_catalog = catalog.copy()
+        candidate_scope = "full catalogue"
+    else:
+        embedding_catalog = observed_catalog
+        candidate_scope = "observed products"
 
     config = BatchEmbeddingConfig(
         model="text-embedding-3-small",
@@ -87,13 +102,14 @@ def main() -> None:
     )
 
     manifest_path, manifest = prepare_embedding_batches(
-        catalog=fit_catalog,
+        catalog=embedding_catalog,
         cache_path=CACHE_PATH,
         output_root=BATCH_ROOT,
         config=config,
     )
 
     print(f"Fit through:      {args.fit_through}")
+    print(f"Candidate scope:  {candidate_scope}")
     print(f"Workload ID:      {manifest['workload_id']}")
     print(f"Catalogue items:  {manifest['catalog_products']:,}")
     print(f"Unique texts:     {manifest['unique_texts']:,}")
