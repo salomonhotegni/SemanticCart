@@ -1,5 +1,6 @@
-"""Prepare OpenAI Batch API requests for training-catalogue embeddings."""
+"""Prepare OpenAI Batch API requests for a selected fitting horizon."""
 
+import argparse
 from pathlib import Path
 
 import pandas as pd
@@ -18,33 +19,63 @@ CACHE_PATH = ARTIFACT_ROOT / "embedding_cache.parquet"
 BATCH_ROOT = ARTIFACT_ROOT / "batches"
 
 
+def parse_args() -> argparse.Namespace:
+    """Parse the last chronological split included during model fitting."""
+    parser = argparse.ArgumentParser(
+        description="Prepare cache-aware catalogue embedding batches."
+    )
+    parser.add_argument(
+        "--fit-through",
+        choices=("train", "validation"),
+        default="train",
+        help=(
+            "Use train only, or train plus validation for the final refit."
+        ),
+    )
+    return parser.parse_args()
+
+
 def main() -> None:
     """Generate resumable JSONL chunks without calling the API."""
-    train = pd.read_parquet(
-        DATA_DIR / "train.parquet",
-        columns=["item_id"],
+    args = parse_args()
+
+    split_files = ["train.parquet"]
+
+    if args.fit_through == "validation":
+        split_files.append("validation.parquet")
+
+    fit_events = pd.concat(
+        [
+            pd.read_parquet(
+                DATA_DIR / filename,
+                columns=["item_id"],
+            )
+            for filename in split_files
+        ],
+        ignore_index=True,
     )
+
     catalog = pd.read_parquet(
         DATA_DIR / "catalog.parquet",
         columns=["item_id", "catalog_text"],
     )
 
-    train_item_ids = pd.Index(
-        train["item_id"].astype(str).unique()
+    fit_item_ids = pd.Index(
+        fit_events["item_id"].astype(str).unique()
     )
 
-    training_catalog = catalog.loc[
-        catalog["item_id"].astype(str).isin(train_item_ids)
+    fit_catalog = catalog.loc[
+        catalog["item_id"].astype(str).isin(fit_item_ids)
     ].copy()
 
-    missing_metadata = train_item_ids.difference(
-        pd.Index(training_catalog["item_id"].astype(str))
+    missing_metadata = fit_item_ids.difference(
+        pd.Index(fit_catalog["item_id"].astype(str))
     )
 
     if len(missing_metadata):
         raise ValueError(
             f"Missing metadata for {len(missing_metadata)} "
-            "training products."
+            "fit products."
         )
 
     config = BatchEmbeddingConfig(
@@ -56,12 +87,13 @@ def main() -> None:
     )
 
     manifest_path, manifest = prepare_embedding_batches(
-        catalog=training_catalog,
+        catalog=fit_catalog,
         cache_path=CACHE_PATH,
         output_root=BATCH_ROOT,
         config=config,
     )
 
+    print(f"Fit through:      {args.fit_through}")
     print(f"Workload ID:      {manifest['workload_id']}")
     print(f"Catalogue items:  {manifest['catalog_products']:,}")
     print(f"Unique texts:     {manifest['unique_texts']:,}")
