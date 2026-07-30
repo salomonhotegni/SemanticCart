@@ -24,9 +24,14 @@ TEST_SPECS = [
         "512d embeddings with FAISS HNSW",
     ),
     (
-        "Hybrid",
+        "Long-term hybrid",
         RESULTS_DIR / "video_games_5core_hybrid_test.json",
-        "ALS Top-10 reranked; semantic weight 0.6",
+        "ALS Top-10 reranked by long-term semantics; weight 0.6",
+    ),
+    (
+        "Returning-user hybrid",
+        RESULTS_DIR / "video_games_5core_returning_user_test.json",
+        "ALS Top-10 reranked by one-item session intent; weight 0.5",
     ),
 ]
 
@@ -35,7 +40,13 @@ VALIDATION_PATHS = {
     "OpenAI content": (
         RESULTS_DIR / "video_games_5core_openai_semantic.json"
     ),
-    "Hybrid": RESULTS_DIR / "video_games_5core_hybrid.json",
+    "Long-term hybrid": (
+        RESULTS_DIR / "video_games_5core_hybrid.json"
+    ),
+    "Returning-user hybrid": (
+        RESULTS_DIR
+        / "video_games_5core_returning_user_tuning.json"
+    ),
 }
 
 
@@ -58,9 +69,19 @@ def timing_fields(
     result: dict,
 ) -> tuple[str, float, float]:
     """Return explicitly scoped bulk-stage timing."""
-    if model == "Hybrid":
+    if model in {
+        "Long-term hybrid",
+        "Returning-user hybrid",
+    }:
         seconds = result["ranking_seconds"]
-        users = result["recommendation_rows"] / result["k"]
+        users = result.get("candidate_users")
+
+        if users is None:
+            users = (
+                result["recommendation_rows"]
+                / result["k"]
+            )
+
         return "reranking only", seconds, users / seconds
 
     return (
@@ -85,9 +106,25 @@ def validate_test_protocol(model: str, result: dict) -> None:
         raise ValueError(
             f"{model} was not fitted through validation."
         )
+    if model == "Returning-user hybrid":
+        if result.get("session_weight") != 0.5:
+            raise ValueError(
+                "Returning-user weight does not match validation."
+            )
+
+        if (
+            result.get(
+                "test_ground_truth_loaded_after_ranking"
+            )
+            is not True
+        ):
+            raise ValueError(
+                "Returning-user labels were not loaded after ranking."
+            )
 
 
 def main() -> None:
+
     """Generate final CSV and portfolio-facing Markdown reports."""
     rows = []
     test_results = {}
@@ -120,29 +157,47 @@ def main() -> None:
             }
         )
 
-        validation_results[model] = load_result(
+        validation_result = load_result(
             VALIDATION_PATHS[model]
         )
 
+        if model == "Returning-user hybrid":
+            validation_result = validation_result[
+                "best_validation_result"
+            ]
+
+        validation_results[model] = validation_result
+
     als = test_results["Collaborative ALS"]
     semantic = test_results["OpenAI content"]
-    hybrid = test_results["Hybrid"]
+    long_term_hybrid = test_results["Long-term hybrid"]
+    returning_hybrid = test_results["Returning-user hybrid"]
 
-    if not isclose(
-        hybrid["recall_at_k"],
-        als["recall_at_k"],
-        rel_tol=0.0,
-        abs_tol=1e-12,
-    ):
-        raise ValueError("Hybrid does not preserve ALS Recall@10.")
+    rerankers = {
+        "Long-term hybrid": long_term_hybrid,
+        "Returning-user hybrid": returning_hybrid,
+    }
 
-    if not isclose(
-        hybrid["catalog_coverage"],
-        als["catalog_coverage"],
-        rel_tol=0.0,
-        abs_tol=1e-12,
-    ):
-        raise ValueError("Hybrid does not preserve ALS coverage.")
+    for model, reranker in rerankers.items():
+        if not isclose(
+            reranker["recall_at_k"],
+            als["recall_at_k"],
+            rel_tol=0.0,
+            abs_tol=1e-12,
+        ):
+            raise ValueError(
+                f"{model} does not preserve ALS Recall@10."
+            )
+
+        if not isclose(
+            reranker["catalog_coverage"],
+            als["catalog_coverage"],
+            rel_tol=0.0,
+            abs_tol=1e-12,
+        ):
+            raise ValueError(
+                f"{model} does not preserve ALS coverage."
+            )
 
     table = pd.DataFrame(rows)
     table.to_csv(CSV_PATH, index=False)
@@ -232,13 +287,25 @@ def main() -> None:
             f"| {row['stage_users_per_second']:,.0f} |"
         )
 
-    ndcg_gain = relative_change(
-        hybrid["ndcg_at_k"],
+    long_term_ndcg_gain = relative_change(
+        long_term_hybrid["ndcg_at_k"],
         als["ndcg_at_k"],
     )
-    mrr_gain = relative_change(
-        hybrid["mrr_at_k"],
+    long_term_mrr_gain = relative_change(
+        long_term_hybrid["mrr_at_k"],
         als["mrr_at_k"],
+    )
+    returning_ndcg_gain = relative_change(
+        returning_hybrid["ndcg_at_k"],
+        als["ndcg_at_k"],
+    )
+    returning_mrr_gain = relative_change(
+        returning_hybrid["mrr_at_k"],
+        als["mrr_at_k"],
+    )
+    returning_vs_long_term_ndcg = relative_change(
+        returning_hybrid["ndcg_at_k"],
+        long_term_hybrid["ndcg_at_k"],
     )
     coverage_ratio = (
         semantic["catalog_coverage"]
@@ -249,19 +316,29 @@ def main() -> None:
         [
             "",
             (
-                "Hybrid timing measures reranking after candidates already "
+                "Hybrid timings measure reranking after candidates already "
                 "exist, not end-to-end serving latency."
             ),
             "",
             "## Findings",
             "",
             (
-                f"- The fixed hybrid improves test NDCG@10 by "
-                f"{ndcg_gain:.3f}% and MRR@10 by {mrr_gain:.3f}% "
-                "over ALS."
+                f"- Long-term semantic reranking improves test NDCG@10 by "
+                f"{long_term_ndcg_gain:.3f}% and MRR@10 by "
+                f"{long_term_mrr_gain:.3f}% over ALS."
             ),
             (
-                "- Conservative reranking preserves ALS Recall@10 and "
+                f"- Recent-session reranking improves test NDCG@10 by "
+                f"{returning_ndcg_gain:.3f}% and MRR@10 by "
+                f"{returning_mrr_gain:.3f}% over ALS."
+            ),
+            (
+                f"- Recent-session intent improves NDCG@10 by another "
+                f"{returning_vs_long_term_ndcg:.3f}% over the long-term "
+                "semantic hybrid."
+            ),
+            (
+                "- Both conservative rerankers preserve ALS Recall@10 and "
                 "catalogue coverage exactly."
             ),
             (
@@ -269,8 +346,12 @@ def main() -> None:
                 "as much of the fit catalogue as ALS."
             ),
             (
-                "- All three models score lower on the later test horizon, "
+                "- All four models score lower on the later test horizon, "
                 "showing why chronological holdout evaluation matters."
+            ),
+            (
+                "- Returning-user timing reports reranking only; direct "
+                "session candidate scoring is measured separately."
             ),
             (
                 "- Online p50 and p95 latency remain unreported until the "
