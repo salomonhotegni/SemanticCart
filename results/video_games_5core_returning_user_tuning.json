@@ -1,0 +1,141 @@
+{
+  "dataset": "video_games_5core",
+  "model": "als_recent_session_hybrid",
+  "strategy": "conservative_direct_scoring",
+  "feature": "one_item_recent_session_similarity",
+  "session_length": 1,
+  "selection_split": "validation",
+  "selection_metric": "ndcg_at_k",
+  "alpha_grid": [
+    0.0,
+    0.1,
+    0.2,
+    0.3,
+    0.4,
+    0.5,
+    0.6,
+    0.7,
+    0.8,
+    0.9,
+    1.0
+  ],
+  "selected_session_weight": 0.5,
+  "candidate_rows": 947620,
+  "direct_score_coverage": 1.0,
+  "als_source_metrics": {
+    "recall_at_k": 0.08135117452143265,
+    "ndcg_at_k": 0.04350510760412205,
+    "mrr_at_k": 0.03204451134554973,
+    "catalog_coverage": 0.07866180906491166
+  },
+  "trials": [
+    {
+      "session_weight": 0.0,
+      "ranking_seconds": 1.5337098180002613,
+      "recommendation_rows": 947620,
+      "recall_at_k": 0.08135117452143265,
+      "ndcg_at_k": 0.04350510760412205,
+      "mrr_at_k": 0.03204451134554973,
+      "catalog_coverage": 0.07866180906491166
+    },
+    {
+      "session_weight": 0.1,
+      "ranking_seconds": 1.3734836670000732,
+      "recommendation_rows": 947620,
+      "recall_at_k": 0.08135117452143265,
+      "ndcg_at_k": 0.04383249622423656,
+      "mrr_at_k": 0.03244204863445699,
+      "catalog_coverage": 0.07866180906491166
+    },
+    {
+      "session_weight": 0.2,
+      "ranking_seconds": 1.379134613000133,
+      "recommendation_rows": 947620,
+      "recall_at_k": 0.08135117452143265,
+      "ndcg_at_k": 0.044154727772694705,
+      "mrr_at_k": 0.03283596783654824,
+      "catalog_coverage": 0.07866180906491166
+    },
+    {
+      "session_weight": 0.3,
+      "ranking_seconds": 1.4083277750000889,
+      "recommendation_rows": 947620,
+      "recall_at_k": 0.08135117452143265,
+      "ndcg_at_k": 0.044532114140682234,
+      "mrr_at_k": 0.03331245814493319,
+      "catalog_coverage": 0.07866180906491166
+    },
+    {
+      "session_weight": 0.4,
+      "ranking_seconds": 1.3713791589998436,
+      "recommendation_rows": 947620,
+      "recall_at_k": 0.08135117452143265,
+      "ndcg_at_k": 0.04475288439531331,
+      "mrr_at_k": 0.03358756255856359,
+      "catalog_coverage": 0.07866180906491166
+    },
+    {
+      "session_weight": 0.5,
+      "ranking_seconds": 1.3319661770001403,
+      "recommendation_rows": 947620,
+      "recall_at_k": 0.08135117452143265,
+      "ndcg_at_k": 0.044963123857940344,
+      "mrr_at_k": 0.03387058991230494,
+      "catalog_coverage": 0.07866180906491166
+    },
+    {
+      "session_weight": 0.6,
+      "ranking_seconds": 1.3219248860000334,
+      "recommendation_rows": 947620,
+      "recall_at_k": 0.08135117452143265,
+      "ndcg_at_k": 0.044682704610808144,
+      "mrr_at_k": 0.03352328289117298,
+      "catalog_coverage": 0.07866180906491166
+    },
+    {
+      "session_weight": 0.7,
+      "ranking_seconds": 1.3047661489999882,
+      "recommendation_rows": 947620,
+      "recall_at_k": 0.08135117452143265,
+      "ndcg_at_k": 0.04426617995302907,
+      "mrr_at_k": 0.03300509245719351,
+      "catalog_coverage": 0.07866180906491166
+    },
+    {
+      "session_weight": 0.8,
+      "ranking_seconds": 1.35181826500002,
+      "recommendation_rows": 947620,
+      "recall_at_k": 0.08135117452143265,
+      "ndcg_at_k": 0.04376781962357947,
+      "mrr_at_k": 0.032387538638989646,
+      "catalog_coverage": 0.07866180906491166
+    },
+    {
+      "session_weight": 0.9,
+      "ranking_seconds": 1.3423430650000228,
+      "recommendation_rows": 947620,
+      "recall_at_k": 0.08135117452143265,
+      "ndcg_at_k": 0.04302551241263992,
+      "mrr_at_k": 0.03144396337290113,
+      "catalog_coverage": 0.07866180906491166
+    },
+    {
+      "session_weight": 1.0,
+      "ranking_seconds": 1.3426998139998432,
+      "recommendation_rows": 947620,
+      "recall_at_k": 0.08135117452143265,
+      "ndcg_at_k": 0.042292338632265634,
+      "mrr_at_k": 0.030523512036671314,
+      "catalog_coverage": 0.07866180906491166
+    }
+  ],
+  "best_validation_result": {
+    "session_weight": 0.5,
+    "ranking_seconds": 1.3056725960000222,
+    "recommendation_rows": 947620,
+    "recall_at_k": 0.08135117452143265,
+    "ndcg_at_k": 0.044963123857940344,
+    "mrr_at_k": 0.03387058991230494,
+    "catalog_coverage": 0.07866180906491166
+  }
+}

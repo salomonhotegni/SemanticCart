@@ -1,0 +1,53 @@
+{
+  "dataset": "video_games_5core",
+  "model": "als_recent_session_hybrid",
+  "strategy": "conservative_direct_scoring",
+  "evaluation_split": "test",
+  "fit_splits": [
+    "train",
+    "validation"
+  ],
+  "selection_split": "validation",
+  "selection_metric": "ndcg_at_k",
+  "session_length": 1,
+  "session_weight": 0.5,
+  "test_used_for_tuning": false,
+  "test_ground_truth_loaded_after_ranking": true,
+  "k": 10,
+  "fit_interactions": 719824,
+  "test_interactions": 94762,
+  "candidate_users": 94762,
+  "candidate_rows": 947620,
+  "direct_score_coverage": 1.0,
+  "ranking_seconds": 1.2927404560000468,
+  "source_metrics": {
+    "als": {
+      "recall_at_k": 0.07103058187881219,
+      "ndcg_at_k": 0.03880224582503038,
+      "mrr_at_k": 0.02904055707816709,
+      "catalog_coverage": 0.078828125
+    },
+    "long_term_semantic_hybrid": {
+      "recall_at_k": 0.07103058187881219,
+      "ndcg_at_k": 0.038932654718881604,
+      "mrr_at_k": 0.029193232804121134,
+      "catalog_coverage": 0.078828125
+    }
+  },
+  "delta_vs_als": {
+    "recall_at_k": 0.0,
+    "ndcg_at_k": 0.0013331920627292285,
+    "mrr_at_k": 0.0016672093796890643,
+    "catalog_coverage": 0.0
+  },
+  "delta_vs_long_term_hybrid": {
+    "recall_at_k": 0.0,
+    "ndcg_at_k": 0.0012027831688780077,
+    "mrr_at_k": 0.0015145336537350194,
+    "catalog_coverage": 0.0
+  },
+  "recall_at_k": 0.07103058187881219,
+  "ndcg_at_k": 0.04013543788775961,
+  "mrr_at_k": 0.030707766457856153,
+  "catalog_coverage": 0.078828125
+}
