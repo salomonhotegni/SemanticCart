@@ -274,3 +274,116 @@ def test_session_rejects_invalid_inputs(semantic_model):
             k=2,
             recency_decay=0,
         )
+        
+
+def test_scores_every_fixed_candidate(semantic_model):
+    model, _ = semantic_model
+    candidates = pd.DataFrame(
+        {
+            "user_id": ["u1", "u1", "u1", "u2", "u2"],
+            "item_id": ["d", "c", "e", "c", "d"],
+        }
+    )
+
+    scored = model.score_candidates(candidates)
+
+    assert len(scored) == len(candidates)
+    assert set(
+        zip(scored["user_id"], scored["item_id"])
+    ) == set(
+        zip(candidates["user_id"], candidates["item_id"])
+    )
+
+    first_items = (
+        scored.loc[scored["rank"] == 1]
+        .set_index("user_id")["item_id"]
+        .to_dict()
+    )
+
+    assert first_items == {
+        "u1": "c",
+        "u2": "d",
+    }
+
+    for _, user_scores in scored.groupby("user_id"):
+        assert user_scores["rank"].tolist() == list(
+            range(1, len(user_scores) + 1)
+        )
+        assert user_scores[
+            "semantic_score"
+        ].is_monotonic_decreasing
+
+
+def test_scores_empty_candidate_frame(semantic_model):
+    model, _ = semantic_model
+
+    scored = model.score_candidates(
+        pd.DataFrame(columns=["user_id", "item_id"])
+    )
+
+    assert scored.empty
+    assert scored.columns.tolist() == model.RESULT_COLUMNS
+
+
+def test_candidate_scoring_rejects_duplicate_pairs(
+    semantic_model,
+):
+    model, _ = semantic_model
+    candidates = pd.DataFrame(
+        {
+            "user_id": ["u1", "u1"],
+            "item_id": ["c", "c"],
+        }
+    )
+
+    with pytest.raises(ValueError, match="must be unique"):
+        model.score_candidates(candidates)
+
+
+@pytest.mark.parametrize(
+    ("candidates", "message"),
+    [
+        (
+            pd.DataFrame(
+                {
+                    "user_id": ["unknown"],
+                    "item_id": ["c"],
+                }
+            ),
+            "Unknown users",
+        ),
+        (
+            pd.DataFrame(
+                {
+                    "user_id": ["u1"],
+                    "item_id": ["unknown"],
+                }
+            ),
+            "Unknown products",
+        ),
+        (
+            pd.DataFrame({"user_id": ["u1"]}),
+            "item_id",
+        ),
+        (
+            pd.DataFrame(
+                {
+                    "user_id": [None],
+                    "item_id": ["c"],
+                }
+            ),
+            "cannot be null",
+        ),
+    ],
+)
+
+
+def test_candidate_scoring_rejects_invalid_inputs(
+    semantic_model,
+    candidates,
+    message,
+):
+    model, _ = semantic_model
+
+    with pytest.raises(ValueError, match=message):
+        model.score_candidates(candidates)

@@ -286,3 +286,124 @@ class DenseSemanticRecommender:
             records,
             columns=self.SESSION_RESULT_COLUMNS,
         )
+     
+        
+    def score_candidates(
+        self,
+        candidates: pd.DataFrame,
+    ) -> pd.DataFrame:
+        """Score a fixed candidate set against dense user profiles.
+
+        Every candidate receives an exact cosine-similarity score. Processing
+        is batched to avoid materializing full user and item vector matrices.
+
+        Args:
+            candidates: Unique user-item pairs to score.
+
+        Returns:
+            Candidates ranked by semantic score within each user.
+
+        Raises:
+            ValueError: If columns, identifiers, users, items, or candidate
+                pairs are invalid.
+        """
+        required = {"user_id", "item_id"}
+        missing = required - set(candidates.columns)
+
+        if missing:
+            raise ValueError(
+                f"Missing candidate columns: {sorted(missing)}"
+            )
+
+        work = candidates[["user_id", "item_id"]].copy()
+
+        if work.empty:
+            return pd.DataFrame(columns=self.RESULT_COLUMNS)
+
+        if work.isna().any().any():
+            raise ValueError(
+                "Candidate user and item identifiers cannot be null."
+            )
+
+        work["user_id"] = work["user_id"].astype(str)
+        work["item_id"] = work["item_id"].astype(str)
+
+        if work.duplicated(["user_id", "item_id"]).any():
+            raise ValueError(
+                "Candidate user-item pairs must be unique."
+            )
+
+        user_positions = work["user_id"].map(
+            self.profiles.user_to_index
+        )
+        item_positions = work["item_id"].map(
+            self.item_index.item_to_index
+        )
+
+        if user_positions.isna().any():
+            unknown_users = work.loc[
+                user_positions.isna(),
+                "user_id",
+            ].drop_duplicates().head(5).tolist()
+
+            raise ValueError(
+                f"Unknown users: {unknown_users}"
+            )
+
+        if item_positions.isna().any():
+            unknown_items = work.loc[
+                item_positions.isna(),
+                "item_id",
+            ].drop_duplicates().head(5).tolist()
+
+            raise ValueError(
+                f"Unknown products: {unknown_items}"
+            )
+
+        user_indices = user_positions.to_numpy(
+            dtype=np.int32
+        )
+        item_indices = item_positions.to_numpy(
+            dtype=np.int32
+        )
+        scores = np.empty(len(work), dtype=np.float32)
+
+        for start in range(
+            0,
+            len(work),
+            self.config.batch_size,
+        ):
+            stop = min(
+                start + self.config.batch_size,
+                len(work),
+            )
+
+            user_vectors = self.profiles.user_profiles[
+                user_indices[start:stop]
+            ]
+            item_vectors = self.item_index.item_vectors[
+                item_indices[start:stop]
+            ]
+
+            scores[start:stop] = np.einsum(
+                "ij,ij->i",
+                user_vectors,
+                item_vectors,
+            )
+
+        if not np.isfinite(scores).all():
+            raise ValueError(
+                "Candidate scoring produced non-finite values."
+            )
+
+        work["semantic_score"] = scores
+
+        work = work.sort_values(
+            ["user_id", "semantic_score", "item_id"],
+            ascending=[True, False, True],
+        )
+        work["rank"] = (
+            work.groupby("user_id").cumcount() + 1
+        )
+
+        return work[self.RESULT_COLUMNS].reset_index(drop=True)
