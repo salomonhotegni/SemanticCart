@@ -274,3 +274,406 @@ def evaluate_diversity(
         novelty=float(merged["novelty"].mean()),
         price_dispersion=float(np.mean(price_values)),
     )
+
+
+@dataclass(frozen=True)
+class DiversityRerankConfig:
+    """Configure relevance, novelty, and redundancy-aware reranking.
+
+    Attributes:
+        k: Maximum recommendations selected per user.
+        relevance_weight: MMR tradeoff between utility and redundancy.
+        novelty_weight: Popularity novelty contribution to item utility.
+        semantic_similarity_weight: Semantic redundancy contribution.
+        category_similarity_weight: Category redundancy contribution.
+        price_similarity_weight: Price redundancy contribution.
+    """
+
+    k: int = 10
+    relevance_weight: float = 0.90
+    novelty_weight: float = 0.05
+    semantic_similarity_weight: float = 0.70
+    category_similarity_weight: float = 0.20
+    price_similarity_weight: float = 0.10
+
+
+DIVERSITY_RESULT_COLUMNS = [
+    "user_id",
+    "item_id",
+    "rank",
+    "diversity_score",
+    "relevance_score",
+    "relevance_normalized",
+    "novelty_normalized",
+    "redundancy_penalty",
+    "source_rank",
+]
+
+
+def _validate_rerank_config(
+    config: DiversityRerankConfig,
+) -> None:
+    """Reject invalid reranking weights and output sizes."""
+    if config.k <= 0:
+        raise ValueError("k must be greater than zero.")
+
+    bounded_weights = {
+        "relevance_weight": config.relevance_weight,
+        "novelty_weight": config.novelty_weight,
+    }
+
+    for name, value in bounded_weights.items():
+        if not 0 <= value <= 1:
+            raise ValueError(
+                f"{name} must be between zero and one."
+            )
+
+    similarity_weights = np.asarray(
+        [
+            config.semantic_similarity_weight,
+            config.category_similarity_weight,
+            config.price_similarity_weight,
+        ],
+        dtype=np.float64,
+    )
+
+    if (
+        not np.isfinite(similarity_weights).all()
+        or np.any(similarity_weights < 0)
+    ):
+        raise ValueError(
+            "Similarity weights must be finite and non-negative."
+        )
+
+    if not np.isclose(similarity_weights.sum(), 1.0):
+        raise ValueError(
+            "Similarity weights must sum to one."
+        )
+
+
+def _prepare_rerank_candidates(
+    candidates: pd.DataFrame,
+    item_features: pd.DataFrame,
+    score_column: str,
+) -> pd.DataFrame:
+    """Validate candidates and attach normalized reranking features."""
+    required = {
+        "user_id",
+        "item_id",
+        "rank",
+        score_column,
+    }
+    missing = required - set(candidates.columns)
+
+    if missing:
+        raise ValueError(
+            f"Missing candidate columns: {sorted(missing)}"
+        )
+
+    prepared = candidates[
+        ["user_id", "item_id", "rank", score_column]
+    ].copy()
+    prepared["user_id"] = prepared["user_id"].astype(str)
+    prepared["item_id"] = prepared["item_id"].astype(str)
+    prepared["rank"] = pd.to_numeric(
+        prepared["rank"],
+        errors="coerce",
+    )
+    prepared[score_column] = pd.to_numeric(
+        prepared[score_column],
+        errors="coerce",
+    )
+
+    numeric_values = prepared[
+        ["rank", score_column]
+    ].to_numpy()
+
+    if (
+        np.isnan(numeric_values).any()
+        or not np.isfinite(numeric_values).all()
+    ):
+        raise ValueError(
+            "Candidate ranks and relevance scores must be finite."
+        )
+    if (prepared["rank"] <= 0).any():
+        raise ValueError(
+            "Candidate ranks must be positive."
+        )
+
+    prepared = (
+        prepared.sort_values(
+            ["user_id", "rank", score_column, "item_id"],
+            ascending=[True, True, False, True],
+        )
+        .drop_duplicates(
+            ["user_id", "item_id"],
+            keep="first",
+        )
+    )
+
+    if prepared.duplicated(["user_id", "rank"]).any():
+        raise ValueError(
+            "Each user can have only one candidate at each rank."
+        )
+
+    features = _validate_features(item_features)
+
+    unknown_items = pd.Index(
+        prepared["item_id"].unique()
+    ).difference(pd.Index(features["item_id"]))
+
+    if len(unknown_items):
+        raise ValueError(
+            f"Missing features for items: {unknown_items[:5].tolist()}"
+        )
+
+    maximum_popularity = features["popularity"].max()
+
+    if maximum_popularity > 0:
+        features["novelty_normalized"] = (
+            1.0
+            - np.log1p(features["popularity"])
+            / np.log1p(maximum_popularity)
+        )
+    else:
+        features["novelty_normalized"] = 1.0
+
+    merged = prepared.merge(
+        features,
+        on="item_id",
+        how="left",
+        validate="many_to_one",
+    )
+
+    grouped_scores = merged.groupby("user_id")[
+        score_column
+    ]
+    score_minimum = grouped_scores.transform("min")
+    score_maximum = grouped_scores.transform("max")
+    score_range = score_maximum - score_minimum
+
+    merged["relevance_normalized"] = (
+        (merged[score_column] - score_minimum)
+        / score_range.where(score_range > 0)
+    ).fillna(1.0)
+
+    return merged.rename(
+        columns={score_column: "relevance_score"}
+    )
+
+
+def _pairwise_redundancy(
+    group: pd.DataFrame,
+    config: DiversityRerankConfig,
+) -> np.ndarray:
+    """Build pairwise redundancy from available product signals."""
+    vectors = np.vstack(group["embedding"])
+    cosine_similarity = np.clip(
+        vectors @ vectors.T,
+        -1.0,
+        1.0,
+    )
+    semantic_similarity = (
+        cosine_similarity + 1.0
+    ) / 2.0
+
+    weighted_similarity = (
+        config.semantic_similarity_weight
+        * semantic_similarity
+    )
+    available_weight = np.full(
+        semantic_similarity.shape,
+        config.semantic_similarity_weight,
+        dtype=np.float32,
+    )
+
+    categories = group["categories"].to_numpy()
+    category_available = (
+        categories[:, None].astype(bool)
+        & categories[None, :].astype(bool)
+    )
+    category_similarity = (
+        categories[:, None] == categories[None, :]
+    )
+
+    weighted_similarity += (
+        config.category_similarity_weight
+        * category_similarity
+        * category_available
+    )
+    available_weight += (
+        config.category_similarity_weight
+        * category_available
+    )
+
+    prices = group["price"].to_numpy(dtype=np.float64)
+    price_available = (
+        np.isfinite(prices[:, None])
+        & np.isfinite(prices[None, :])
+    )
+    log_prices = np.log1p(prices)
+    price_similarity = np.exp(
+        -np.abs(
+            log_prices[:, None] - log_prices[None, :]
+        )
+    )
+    price_similarity = np.where(
+        price_available,
+        price_similarity,
+        0.0,
+    )
+
+    weighted_similarity += (
+        config.price_similarity_weight
+        * price_similarity
+    )
+    available_weight += (
+        config.price_similarity_weight
+        * price_available
+    )
+
+    redundancy = np.divide(
+        weighted_similarity,
+        available_weight,
+        out=np.zeros_like(
+            weighted_similarity,
+            dtype=np.float32,
+        ),
+        where=available_weight > 0,
+    )
+
+    np.fill_diagonal(redundancy, 1.0)
+    return redundancy
+
+
+def _rerank_one_user(
+    group: pd.DataFrame,
+    config: DiversityRerankConfig,
+) -> list[dict]:
+    """Greedily select one user's recommendations with MMR."""
+    group = group.reset_index(drop=True)
+    redundancy = _pairwise_redundancy(
+        group,
+        config,
+    )
+
+    relevance = group[
+        "relevance_normalized"
+    ].to_numpy(dtype=np.float64)
+    novelty = group[
+        "novelty_normalized"
+    ].to_numpy(dtype=np.float64)
+
+    utility = (
+        (1.0 - config.novelty_weight) * relevance
+        + config.novelty_weight * novelty
+    )
+
+    source_ranks = group["rank"].to_numpy()
+    item_ids = group["item_id"].to_numpy()
+    remaining = np.ones(len(group), dtype=bool)
+    maximum_redundancy = np.zeros(
+        len(group),
+        dtype=np.float64,
+    )
+
+    records = []
+    output_size = min(config.k, len(group))
+
+    for output_rank in range(1, output_size + 1):
+        diversity_scores = (
+            config.relevance_weight * utility
+            - (1.0 - config.relevance_weight)
+            * maximum_redundancy
+        )
+
+        available = np.flatnonzero(remaining)
+        order = np.lexsort(
+            (
+                item_ids[available],
+                source_ranks[available],
+                -diversity_scores[available],
+            )
+        )
+        selected = available[order[0]]
+
+        records.append(
+            {
+                "user_id": group.at[selected, "user_id"],
+                "item_id": item_ids[selected],
+                "rank": output_rank,
+                "diversity_score": diversity_scores[selected],
+                "relevance_score": group.at[
+                    selected,
+                    "relevance_score",
+                ],
+                "relevance_normalized": relevance[selected],
+                "novelty_normalized": novelty[selected],
+                "redundancy_penalty": (
+                    maximum_redundancy[selected]
+                ),
+                "source_rank": source_ranks[selected],
+            }
+        )
+
+        remaining[selected] = False
+        maximum_redundancy = np.maximum(
+            maximum_redundancy,
+            redundancy[:, selected],
+        )
+
+    return records
+
+
+def rerank_diverse_candidates(
+    candidates: pd.DataFrame,
+    item_features: pd.DataFrame,
+    config: DiversityRerankConfig | None = None,
+    score_column: str = "hybrid_score",
+) -> pd.DataFrame:
+    """Select relevance-aware, novel, and non-redundant products.
+
+    The function applies maximal marginal relevance independently to each
+    user. Relevance and popularity novelty determine item utility, while
+    semantic, category, and price similarity determine redundancy.
+
+    Args:
+        candidates: Deeper ranked candidate pool with a relevance score.
+        item_features: Catalogue embeddings, metadata, and popularity counts.
+        config: Optional reranking weights and final output size.
+        score_column: Candidate column containing ranking relevance.
+
+    Returns:
+        Top-K diversified recommendations with auditable score components.
+
+    Raises:
+        ValueError: If configuration, candidates, or features are invalid.
+    """
+    config = config or DiversityRerankConfig()
+    _validate_rerank_config(config)
+
+    prepared = _prepare_rerank_candidates(
+        candidates,
+        item_features,
+        score_column,
+    )
+
+    if prepared.empty:
+        return pd.DataFrame(
+            columns=DIVERSITY_RESULT_COLUMNS
+        )
+
+    records = []
+
+    for _, group in prepared.groupby(
+        "user_id",
+        sort=False,
+    ):
+        records.extend(
+            _rerank_one_user(group, config)
+        )
+
+    return pd.DataFrame.from_records(
+        records,
+        columns=DIVERSITY_RESULT_COLUMNS,
+    )
