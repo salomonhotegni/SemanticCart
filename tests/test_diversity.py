@@ -1,0 +1,233 @@
+import numpy as np
+import pandas as pd
+import pytest
+
+from semanticcart.diversity import (
+    DiversityMetrics,
+    evaluate_diversity,
+)
+
+
+@pytest.fixture
+def item_features() -> pd.DataFrame:
+    """Build a small catalogue with controlled feature relationships."""
+    return pd.DataFrame(
+        {
+            "item_id": ["a", "b", "c", "d"],
+            "embedding": [
+                np.array([1.0, 0.0]),
+                np.array([1.0, 0.0]),
+                np.array([0.0, 1.0]),
+                np.array([-1.0, 0.0]),
+            ],
+            "categories": [
+                "Action",
+                "Action",
+                "Puzzle",
+                "Strategy",
+            ],
+            "price": [10.0, 20.0, 40.0, 80.0],
+            "popularity": [90, 9, 0, 0],
+        }
+    )
+
+
+@pytest.fixture
+def recommendations() -> pd.DataFrame:
+    """Build two recommendation lists with known diversity values."""
+    return pd.DataFrame(
+        {
+            "user_id": ["u1", "u1", "u1", "u2", "u2"],
+            "item_id": ["a", "b", "d", "a", "c"],
+            "rank": [1, 2, 3, 1, 2],
+        }
+    )
+
+
+def test_computes_expected_metrics(
+    recommendations: pd.DataFrame,
+    item_features: pd.DataFrame,
+) -> None:
+    metrics = evaluate_diversity(
+        recommendations,
+        item_features,
+        k=2,
+    )
+
+    expected_novelty = np.mean(
+        [
+            -np.log2(91 / 103),
+            -np.log2(10 / 103),
+            -np.log2(91 / 103),
+            -np.log2(1 / 103),
+        ]
+    )
+    expected_price_dispersion = np.mean(
+        [
+            abs(np.log1p(10) - np.log1p(20)),
+            abs(np.log1p(10) - np.log1p(40)),
+        ]
+    )
+
+    assert metrics.intra_list_diversity == pytest.approx(0.5)
+    assert metrics.category_variety == pytest.approx(0.75)
+    assert metrics.category_coverage == pytest.approx(2 / 3)
+    assert metrics.novelty == pytest.approx(expected_novelty)
+    assert metrics.price_dispersion == pytest.approx(
+        expected_price_dispersion
+    )
+
+
+def test_excludes_items_below_k(
+    recommendations: pd.DataFrame,
+    item_features: pd.DataFrame,
+) -> None:
+    metrics = evaluate_diversity(
+        recommendations,
+        item_features,
+        k=2,
+    )
+
+    assert metrics.category_coverage == pytest.approx(2 / 3)
+
+
+def test_empty_recommendations_return_zero_metrics(
+    item_features: pd.DataFrame,
+) -> None:
+    recommendations = pd.DataFrame(
+        columns=["user_id", "item_id", "rank"]
+    )
+
+    metrics = evaluate_diversity(
+        recommendations,
+        item_features,
+    )
+
+    assert metrics == DiversityMetrics(
+        intra_list_diversity=0.0,
+        category_variety=0.0,
+        category_coverage=0.0,
+        novelty=0.0,
+        price_dispersion=0.0,
+    )
+
+
+def test_rejects_missing_item_features(
+    item_features: pd.DataFrame,
+) -> None:
+    recommendations = pd.DataFrame(
+        {
+            "user_id": ["u1"],
+            "item_id": ["missing"],
+            "rank": [1],
+        }
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="Missing features for items",
+    ):
+        evaluate_diversity(
+            recommendations,
+            item_features,
+        )
+
+
+def test_rejects_duplicate_ranks(
+    item_features: pd.DataFrame,
+) -> None:
+    recommendations = pd.DataFrame(
+        {
+            "user_id": ["u1", "u1"],
+            "item_id": ["a", "b"],
+            "rank": [1, 1],
+        }
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="only one item at each rank",
+    ):
+        evaluate_diversity(
+            recommendations,
+            item_features,
+        )
+
+
+def test_rejects_duplicate_feature_ids(
+    recommendations: pd.DataFrame,
+    item_features: pd.DataFrame,
+) -> None:
+    duplicated = pd.concat(
+        [item_features, item_features.iloc[[0]]],
+        ignore_index=True,
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="Item feature IDs must be unique",
+    ):
+        evaluate_diversity(
+            recommendations,
+            duplicated,
+        )
+
+
+@pytest.mark.parametrize(
+    ("column", "value", "message"),
+    [
+        (
+            "embedding",
+            np.array([0.0, 0.0]),
+            "zero vectors",
+        ),
+        (
+            "price",
+            -1.0,
+            "Prices must be non-negative",
+        ),
+        (
+            "popularity",
+            -1.0,
+            "Popularity values must be finite",
+        ),
+    ],
+)
+def test_rejects_invalid_item_features(
+    recommendations: pd.DataFrame,
+    item_features: pd.DataFrame,
+    column: str,
+    value: object,
+    message: str,
+) -> None:
+    invalid = item_features.copy()
+    invalid.at[0, column] = value
+
+    with pytest.raises(ValueError, match=message):
+        evaluate_diversity(
+            recommendations,
+            invalid,
+        )
+
+
+@pytest.mark.parametrize("rank", [0, -1, np.nan])
+def test_rejects_invalid_ranks(
+    item_features: pd.DataFrame,
+    rank: float,
+) -> None:
+    recommendations = pd.DataFrame(
+        {
+            "user_id": ["u1"],
+            "item_id": ["a"],
+            "rank": [rank],
+        }
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="Ranks must be finite and positive",
+    ):
+        evaluate_diversity(
+            recommendations,
+            item_features,
+        )
