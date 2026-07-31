@@ -189,3 +189,74 @@ def test_dense_profile_artifacts_are_readable(
         user_profiles.user_ids.tolist()
     )
     assert saved_config["recency_decay"] == pytest.approx(0.1)
+
+def test_saved_profiles_round_trip(
+    item_index,
+    user_profiles,
+    tmp_path,
+):
+    user_profiles.save(tmp_path)
+
+    loaded = DenseUserProfiles.load(
+        item_index,
+        tmp_path,
+    )
+
+    assert loaded.config == user_profiles.config
+    assert np.array_equal(
+        loaded.user_ids,
+        user_profiles.user_ids,
+    )
+    assert np.allclose(
+        loaded.user_profiles,
+        user_profiles.user_profiles,
+    )
+    assert (
+        loaded.user_items
+        != user_profiles.user_items
+    ).nnz == 0
+    assert loaded.indices_for(
+        ["u2", "u1"]
+    ).tolist() == [1, 0]
+
+
+def test_load_rejects_missing_profile_artifacts(
+    item_index,
+    tmp_path,
+):
+    with pytest.raises(
+        FileNotFoundError,
+        match="Missing profile artifacts",
+    ):
+        DenseUserProfiles.load(
+            item_index,
+            tmp_path,
+        )
+
+
+def test_load_rejects_mismatched_item_index(
+    user_profiles,
+    tmp_path,
+):
+    user_profiles.save(tmp_path)
+
+    smaller_index = DenseItemIndex.from_catalog(
+        pd.DataFrame(
+            {
+                "item_id": ["a", "b"],
+                "embedding": [
+                    [1.0, 0.0],
+                    [0.0, 1.0],
+                ],
+            }
+        )
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="Profile user-item matrix has shape",
+    ):
+        DenseUserProfiles.load(
+            smaller_index,
+            tmp_path,
+        )

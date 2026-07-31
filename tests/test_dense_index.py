@@ -157,3 +157,47 @@ def test_dense_index_artifacts_are_readable(
         dense_index.item_ids.tolist()
     )
     assert saved_config["connections"] == 8
+
+def test_saved_index_round_trip_preserves_search(
+    dense_index,
+    tmp_path,
+):
+    dense_index.save(tmp_path)
+
+    loaded = DenseItemIndex.load(tmp_path)
+
+    assert loaded.config == dense_index.config
+    assert np.array_equal(
+        loaded.item_ids,
+        dense_index.item_ids,
+    )
+    assert np.allclose(
+        loaded.item_vectors,
+        dense_index.item_vectors,
+    )
+
+    expected_scores, expected_indices = dense_index.search(
+        np.array([1.0, 0.0]),
+        k=3,
+    )
+    actual_scores, actual_indices = loaded.search(
+        np.array([1.0, 0.0]),
+        k=3,
+    )
+
+    assert np.array_equal(
+        loaded.item_ids[actual_indices],
+        dense_index.item_ids[expected_indices],
+    )
+    assert np.allclose(
+        actual_scores,
+        expected_scores,
+    )
+
+
+def test_load_rejects_missing_index_artifacts(tmp_path):
+    with pytest.raises(
+        FileNotFoundError,
+        match="Missing dense-index artifacts",
+    ):
+        DenseItemIndex.load(tmp_path)

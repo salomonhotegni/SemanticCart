@@ -168,7 +168,161 @@ class DenseItemIndex:
             result_count,
         )
         return scores, indices
-    
+
+    @classmethod
+    def load(
+        cls,
+        directory: str | Path,
+    ) -> "DenseItemIndex":
+        """Load and validate a persisted dense item index.
+
+        Args:
+            directory: Directory containing the FAISS index, vectors,
+                item mapping, and HNSW configuration.
+
+        Returns:
+            A dense index ready for cosine-similarity retrieval.
+
+        Raises:
+            FileNotFoundError: If a required artifact is missing.
+            ValueError: If configuration, mappings, vectors, or index
+                dimensions are inconsistent.
+        """
+        directory = Path(directory)
+        paths = {
+            "index": directory / "item_index.faiss",
+            "vectors": directory / "item_vectors.npy",
+            "items": directory / "items.parquet",
+            "config": directory / "index_config.json",
+        }
+
+        missing = [
+            path.name
+            for path in paths.values()
+            if not path.exists()
+        ]
+
+        if missing:
+            raise FileNotFoundError(
+                f"Missing dense-index artifacts: {sorted(missing)}"
+            )
+
+        with paths["config"].open(
+            encoding="utf-8",
+        ) as source:
+            config_values = json.load(source)
+
+        try:
+            config = HnswConfig(**config_values)
+        except TypeError as error:
+            raise ValueError(
+                "Invalid HNSW configuration artifact."
+            ) from error
+
+        if min(
+            config.connections,
+            config.ef_construction,
+            config.ef_search,
+        ) <= 0:
+            raise ValueError(
+                "HNSW configuration values must be positive."
+            )
+
+        items = pd.read_parquet(paths["items"])
+        required = {"item_index", "item_id"}
+        missing_columns = required - set(items.columns)
+
+        if missing_columns:
+            raise ValueError(
+                "Missing dense item mapping columns: "
+                f"{sorted(missing_columns)}"
+            )
+
+        items["item_index"] = pd.to_numeric(
+            items["item_index"],
+            errors="coerce",
+        )
+
+        if items[["item_index", "item_id"]].isna().any().any():
+            raise ValueError(
+                "Dense item mapping values cannot be missing."
+            )
+
+        items = items.sort_values("item_index")
+        expected_indexes = np.arange(len(items))
+
+        if not np.array_equal(
+            items["item_index"].to_numpy(),
+            expected_indexes,
+        ):
+            raise ValueError(
+                "Dense item indexes must be contiguous."
+            )
+
+        item_ids = items["item_id"].astype(str)
+
+        if item_ids.eq("").any() or item_ids.duplicated().any():
+            raise ValueError(
+                "Dense item IDs must be nonempty and unique."
+            )
+
+        vectors = np.load(
+            paths["vectors"],
+            allow_pickle=False,
+        ).astype(np.float32)
+
+        if vectors.ndim != 2 or vectors.shape[1] == 0:
+            raise ValueError(
+                "Persisted item vectors must be a matrix."
+            )
+        if vectors.shape[0] != len(item_ids):
+            raise ValueError(
+                "Item vectors do not match the item mapping."
+            )
+        if not np.isfinite(vectors).all():
+            raise ValueError(
+                "Persisted item vectors must be finite."
+            )
+
+        norms = np.linalg.norm(vectors, axis=1)
+
+        if np.any(norms == 0):
+            raise ValueError(
+                "Persisted item vectors cannot be zero."
+            )
+        if not np.allclose(
+            norms,
+            1.0,
+            atol=1e-4,
+        ):
+            raise ValueError(
+                "Persisted item vectors must be normalized."
+            )
+
+        index = faiss.read_index(str(paths["index"]))
+
+        if not hasattr(index, "hnsw"):
+            raise ValueError(
+                "Persisted FAISS index is not an HNSW index."
+            )
+        if index.ntotal != len(item_ids):
+            raise ValueError(
+                "FAISS item count does not match the mapping."
+            )
+        if index.d != vectors.shape[1]:
+            raise ValueError(
+                "FAISS dimensions do not match item vectors."
+            )
+
+        index.hnsw.efSearch = config.ef_search
+
+        return cls(
+            item_ids=item_ids.to_numpy(),
+            item_vectors=np.ascontiguousarray(vectors),
+            index=index,
+            config=config,
+        )
+
     def save(self, directory: str | Path) -> None:
         """Persist the FAISS index, vectors, item mapping, and configuration.
 

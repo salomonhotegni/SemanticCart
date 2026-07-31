@@ -5,12 +5,15 @@ import json
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
-from scipy.sparse import csr_matrix, save_npz
+from scipy.sparse import (
+    csr_matrix,
+    load_npz,
+    save_npz,
+)
 
 import faiss
 import numpy as np
 import pandas as pd
-from scipy.sparse import csr_matrix
 
 from semanticcart.dense_index import DenseItemIndex
 
@@ -172,6 +175,171 @@ class DenseUserProfiles:
             config=config,
         )
 
+    @classmethod
+    def load(
+        cls,
+        item_index: DenseItemIndex,
+        directory: str | Path,
+    ) -> "DenseUserProfiles":
+        """Load persisted profiles aligned to a dense item index.
+
+        Args:
+            item_index: Loaded item index used to validate item alignment.
+            directory: Directory containing profiles, observed items,
+                user mappings, and profile configuration.
+
+        Returns:
+            User profiles ready for semantic scoring and retrieval.
+
+        Raises:
+            FileNotFoundError: If a required artifact is missing.
+            ValueError: If mappings, vectors, sparse data, or dimensions
+                are inconsistent.
+        """
+        directory = Path(directory)
+        paths = {
+            "profiles": directory / "user_profiles.npy",
+            "user_items": directory / "user_items.npz",
+            "users": directory / "users.parquet",
+            "config": directory / "profile_config.json",
+        }
+
+        missing = [
+            path.name
+            for path in paths.values()
+            if not path.exists()
+        ]
+
+        if missing:
+            raise FileNotFoundError(
+                f"Missing profile artifacts: {sorted(missing)}"
+            )
+
+        with paths["config"].open(
+            encoding="utf-8",
+        ) as source:
+            config_values = json.load(source)
+
+        try:
+            config = DenseProfileConfig(**config_values)
+        except TypeError as error:
+            raise ValueError(
+                "Invalid dense-profile configuration artifact."
+            ) from error
+
+        if not 0 < config.recency_decay <= 1:
+            raise ValueError(
+                "recency_decay must be between zero and one."
+            )
+
+        users = pd.read_parquet(paths["users"])
+        required = {"user_index", "user_id"}
+        missing_columns = required - set(users.columns)
+
+        if missing_columns:
+            raise ValueError(
+                "Missing dense user mapping columns: "
+                f"{sorted(missing_columns)}"
+            )
+
+        users["user_index"] = pd.to_numeric(
+            users["user_index"],
+            errors="coerce",
+        )
+
+        if users[["user_index", "user_id"]].isna().any().any():
+            raise ValueError(
+                "Dense user mapping values cannot be missing."
+            )
+
+        users = users.sort_values("user_index")
+        expected_indexes = np.arange(len(users))
+
+        if not np.array_equal(
+            users["user_index"].to_numpy(),
+            expected_indexes,
+        ):
+            raise ValueError(
+                "Dense user indexes must be contiguous."
+            )
+
+        user_ids = users["user_id"].astype(str)
+
+        if user_ids.eq("").any() or user_ids.duplicated().any():
+            raise ValueError(
+                "Dense user IDs must be nonempty and unique."
+            )
+
+        profiles = np.load(
+            paths["profiles"],
+            allow_pickle=False,
+        ).astype(np.float32)
+
+        expected_profile_shape = (
+            len(user_ids),
+            item_index.item_vectors.shape[1],
+        )
+
+        if profiles.shape != expected_profile_shape:
+            raise ValueError(
+                f"User profiles have shape {profiles.shape}; "
+                f"expected {expected_profile_shape}."
+            )
+        if not np.isfinite(profiles).all():
+            raise ValueError(
+                "Persisted user profiles must be finite."
+            )
+
+        profile_norms = np.linalg.norm(
+            profiles,
+            axis=1,
+        )
+
+        if np.any(profile_norms == 0):
+            raise ValueError(
+                "Persisted user profiles cannot be zero."
+            )
+        if not np.allclose(
+            profile_norms,
+            1.0,
+            atol=1e-4,
+        ):
+            raise ValueError(
+                "Persisted user profiles must be normalized."
+            )
+
+        user_items = load_npz(
+            paths["user_items"]
+        ).tocsr().astype(np.float32)
+
+        expected_item_shape = (
+            len(user_ids),
+            len(item_index.item_ids),
+        )
+
+        if user_items.shape != expected_item_shape:
+            raise ValueError(
+                f"Profile user-item matrix has shape "
+                f"{user_items.shape}; expected "
+                f"{expected_item_shape}."
+            )
+        if not np.isfinite(user_items.data).all():
+            raise ValueError(
+                "Persisted profile weights must be finite."
+            )
+        if np.any(user_items.data <= 0):
+            raise ValueError(
+                "Persisted profile weights must be positive."
+            )
+
+        return cls(
+            item_index=item_index,
+            user_ids=user_ids.to_numpy(),
+            user_profiles=np.ascontiguousarray(profiles),
+            user_items=user_items,
+            config=config,
+        )
+
     def indices_for(
         self,
         user_ids: Iterable[str],
@@ -191,7 +359,7 @@ class DenseUserProfiles:
             [self.user_to_index[user_id] for user_id in requested],
             dtype=np.int32,
         )
-        
+
     def save(self, directory: str | Path) -> None:
         """Persist dense profiles, observed items, users, and configuration.
 
