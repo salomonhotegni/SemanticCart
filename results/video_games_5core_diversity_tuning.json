@@ -1,0 +1,467 @@
+{
+  "dataset": "video_games_5core",
+  "model": "returning_user_diversity_reranker",
+  "selection_split": "validation",
+  "test_used_for_tuning": false,
+  "k": 10,
+  "candidate_k": 25,
+  "tuning_cohort_users": 10000,
+  "tuning_cohort_selection": "stable pandas hash order",
+  "ndcg_retention_constraint": 0.99,
+  "selected_session_weight": 0.5,
+  "selected_diversity_config": {
+    "k": 10,
+    "relevance_weight": 0.85,
+    "novelty_weight": 0.0,
+    "semantic_similarity_weight": 0.7,
+    "category_similarity_weight": 0.2,
+    "price_similarity_weight": 0.1
+  },
+  "session_trials": [
+    {
+      "session_weight": 0.0,
+      "ranking_seconds": 4.55047199800174,
+      "recall_at_k": 0.08135117452143265,
+      "ndcg_at_k": 0.04350510760412205,
+      "mrr_at_k": 0.03204451134554973,
+      "catalog_coverage": 0.07866180906491166
+    },
+    {
+      "session_weight": 0.1,
+      "ranking_seconds": 4.456563719002588,
+      "recall_at_k": 0.08299740402270953,
+      "ndcg_at_k": 0.04439052105171307,
+      "mrr_at_k": 0.032707144682936666,
+      "catalog_coverage": 0.08065969365769578
+    },
+    {
+      "session_weight": 0.2,
+      "ranking_seconds": 4.3019305289999465,
+      "recall_at_k": 0.08473860830290623,
+      "ndcg_at_k": 0.045285264558273516,
+      "mrr_at_k": 0.03333796063186536,
+      "catalog_coverage": 0.08547812120499863
+    },
+    {
+      "session_weight": 0.3,
+      "ranking_seconds": 4.257894246002252,
+      "recall_at_k": 0.08644815432346299,
+      "ndcg_at_k": 0.04634624473225458,
+      "mrr_at_k": 0.03420276294529687,
+      "catalog_coverage": 0.0918243428526658
+    },
+    {
+      "session_weight": 0.4,
+      "ranking_seconds": 4.304154017001565,
+      "recall_at_k": 0.08691247546484877,
+      "ndcg_at_k": 0.0469667317813626,
+      "mrr_at_k": 0.03484800517788424,
+      "catalog_coverage": 0.0965252477768637
+    },
+    {
+      "session_weight": 0.5,
+      "ranking_seconds": 4.359588095001527,
+      "recall_at_k": 0.08676473691986239,
+      "ndcg_at_k": 0.04714624149420546,
+      "mrr_at_k": 0.03511039184885241,
+      "catalog_coverage": 0.10052101696243193
+    },
+    {
+      "session_weight": 0.6,
+      "ranking_seconds": 4.586534090994974,
+      "recall_at_k": 0.08590996390958401,
+      "ndcg_at_k": 0.04672484044077481,
+      "mrr_at_k": 0.03484848675193961,
+      "catalog_coverage": 0.10283229521682924
+    },
+    {
+      "session_weight": 0.7,
+      "ranking_seconds": 4.805964594001125,
+      "recall_at_k": 0.08382051877334797,
+      "ndcg_at_k": 0.0452735417599855,
+      "mrr_at_k": 0.033602554168287266,
+      "catalog_coverage": 0.10428174090179027
+    },
+    {
+      "session_weight": 0.8,
+      "ranking_seconds": 4.472800096998981,
+      "recall_at_k": 0.08060192904328739,
+      "ndcg_at_k": 0.043145611642837846,
+      "mrr_at_k": 0.03181608611448632,
+      "catalog_coverage": 0.10537861871743644
+    },
+    {
+      "session_weight": 0.9,
+      "ranking_seconds": 4.314433699000801,
+      "recall_at_k": 0.07752052510499989,
+      "ndcg_at_k": 0.04110628854081542,
+      "mrr_at_k": 0.030112009100158356,
+      "catalog_coverage": 0.10612292866376778
+    },
+    {
+      "session_weight": 1.0,
+      "ranking_seconds": 4.23155587400106,
+      "recall_at_k": 0.07417530233637956,
+      "ndcg_at_k": 0.03896145077287234,
+      "mrr_at_k": 0.0283437612960523,
+      "catalog_coverage": 0.10659301915618756
+    }
+  ],
+  "diversity_trials": [
+    {
+      "config": {
+        "k": 10,
+        "relevance_weight": 1.0,
+        "novelty_weight": 0.0,
+        "semantic_similarity_weight": 0.7,
+        "category_similarity_weight": 0.2,
+        "price_similarity_weight": 0.1
+      },
+      "ranking_seconds": 7.827526250999654,
+      "recall_at_k": 0.0903,
+      "ndcg_at_k": 0.048995674093145,
+      "mrr_at_k": 0.03647623015873015,
+      "catalog_coverage": 0.08626160535903162,
+      "intra_list_diversity": 0.4778023123636842,
+      "category_variety": 0.6025,
+      "category_coverage": 0.5818181818181818,
+      "novelty": 11.284797044957681,
+      "price_dispersion": 0.8905575720008726
+    },
+    {
+      "config": {
+        "k": 10,
+        "relevance_weight": 0.98,
+        "novelty_weight": 0.0,
+        "semantic_similarity_weight": 0.7,
+        "category_similarity_weight": 0.2,
+        "price_similarity_weight": 0.1
+      },
+      "ranking_seconds": 7.5486870120003005,
+      "recall_at_k": 0.0902,
+      "ndcg_at_k": 0.048977734772014295,
+      "mrr_at_k": 0.03648309523809523,
+      "catalog_coverage": 0.08622243115132996,
+      "intra_list_diversity": 0.47833154501467945,
+      "category_variety": 0.60595,
+      "category_coverage": 0.5818181818181818,
+      "novelty": 11.282927841368187,
+      "price_dispersion": 0.8919028187054823
+    },
+    {
+      "config": {
+        "k": 10,
+        "relevance_weight": 0.98,
+        "novelty_weight": 0.025,
+        "semantic_similarity_weight": 0.7,
+        "category_similarity_weight": 0.2,
+        "price_similarity_weight": 0.1
+      },
+      "ranking_seconds": 7.6799616440039244,
+      "recall_at_k": 0.09,
+      "ndcg_at_k": 0.048900059784856724,
+      "mrr_at_k": 0.036435555555555554,
+      "catalog_coverage": 0.08633995377443492,
+      "intra_list_diversity": 0.47803941448032855,
+      "category_variety": 0.6055,
+      "category_coverage": 0.5818181818181818,
+      "novelty": 11.289389070845186,
+      "price_dispersion": 0.8910744674606099
+    },
+    {
+      "config": {
+        "k": 10,
+        "relevance_weight": 0.98,
+        "novelty_weight": 0.05,
+        "semantic_similarity_weight": 0.7,
+        "category_similarity_weight": 0.2,
+        "price_similarity_weight": 0.1
+      },
+      "ranking_seconds": 7.770792834999156,
+      "recall_at_k": 0.0901,
+      "ndcg_at_k": 0.04897820181239124,
+      "mrr_at_k": 0.03651575396825397,
+      "catalog_coverage": 0.08645747639753985,
+      "intra_list_diversity": 0.47774437036514283,
+      "category_variety": 0.60491,
+      "category_coverage": 0.5818181818181818,
+      "novelty": 11.295584595963522,
+      "price_dispersion": 0.8910734582319441
+    },
+    {
+      "config": {
+        "k": 10,
+        "relevance_weight": 0.95,
+        "novelty_weight": 0.0,
+        "semantic_similarity_weight": 0.7,
+        "category_similarity_weight": 0.2,
+        "price_similarity_weight": 0.1
+      },
+      "ranking_seconds": 7.526362503995188,
+      "recall_at_k": 0.09,
+      "ndcg_at_k": 0.048934815283200914,
+      "mrr_at_k": 0.03648265873015873,
+      "catalog_coverage": 0.08622243115132996,
+      "intra_list_diversity": 0.4789741777420044,
+      "category_variety": 0.61061,
+      "category_coverage": 0.5818181818181818,
+      "novelty": 11.281152354653203,
+      "price_dispersion": 0.894219586635501
+    },
+    {
+      "config": {
+        "k": 10,
+        "relevance_weight": 0.95,
+        "novelty_weight": 0.025,
+        "semantic_similarity_weight": 0.7,
+        "category_similarity_weight": 0.2,
+        "price_similarity_weight": 0.1
+      },
+      "ranking_seconds": 7.854795735998778,
+      "recall_at_k": 0.09,
+      "ndcg_at_k": 0.048884435201852705,
+      "mrr_at_k": 0.03641325396825397,
+      "catalog_coverage": 0.08637912798213657,
+      "intra_list_diversity": 0.4787312201693654,
+      "category_variety": 0.61025,
+      "category_coverage": 0.5818181818181818,
+      "novelty": 11.286741832400667,
+      "price_dispersion": 0.8939744287571985
+    },
+    {
+      "config": {
+        "k": 10,
+        "relevance_weight": 0.95,
+        "novelty_weight": 0.05,
+        "semantic_similarity_weight": 0.7,
+        "category_similarity_weight": 0.2,
+        "price_similarity_weight": 0.1
+      },
+      "ranking_seconds": 7.350620072000311,
+      "recall_at_k": 0.0899,
+      "ndcg_at_k": 0.04885787438645665,
+      "mrr_at_k": 0.03641952380952381,
+      "catalog_coverage": 0.0864966506052415,
+      "intra_list_diversity": 0.47850802354663613,
+      "category_variety": 0.61003,
+      "category_coverage": 0.5818181818181818,
+      "novelty": 11.293072549413338,
+      "price_dispersion": 0.8933443171047027
+    },
+    {
+      "config": {
+        "k": 10,
+        "relevance_weight": 0.92,
+        "novelty_weight": 0.0,
+        "semantic_similarity_weight": 0.7,
+        "category_similarity_weight": 0.2,
+        "price_similarity_weight": 0.1
+      },
+      "ranking_seconds": 7.631609343996388,
+      "recall_at_k": 0.0901,
+      "ndcg_at_k": 0.04897982445855081,
+      "mrr_at_k": 0.03650781746031746,
+      "catalog_coverage": 0.08606573432052336,
+      "intra_list_diversity": 0.4797112414449453,
+      "category_variety": 0.61559,
+      "category_coverage": 0.5818181818181818,
+      "novelty": 11.278379219196486,
+      "price_dispersion": 0.8965206216137289
+    },
+    {
+      "config": {
+        "k": 10,
+        "relevance_weight": 0.92,
+        "novelty_weight": 0.025,
+        "semantic_similarity_weight": 0.7,
+        "category_similarity_weight": 0.2,
+        "price_similarity_weight": 0.1
+      },
+      "ranking_seconds": 7.532930107998254,
+      "recall_at_k": 0.0898,
+      "ndcg_at_k": 0.04885364620336866,
+      "mrr_at_k": 0.036427976190476184,
+      "catalog_coverage": 0.08618325694362831,
+      "intra_list_diversity": 0.47948826287984847,
+      "category_variety": 0.6154,
+      "category_coverage": 0.5818181818181818,
+      "novelty": 11.284298065128032,
+      "price_dispersion": 0.8962679837492357
+    },
+    {
+      "config": {
+        "k": 10,
+        "relevance_weight": 0.92,
+        "novelty_weight": 0.05,
+        "semantic_similarity_weight": 0.7,
+        "category_similarity_weight": 0.2,
+        "price_similarity_weight": 0.1
+      },
+      "ranking_seconds": 7.64749958000175,
+      "recall_at_k": 0.0898,
+      "ndcg_at_k": 0.04885157651315776,
+      "mrr_at_k": 0.036436031746031744,
+      "catalog_coverage": 0.08637912798213657,
+      "intra_list_diversity": 0.47931568603366614,
+      "category_variety": 0.61544,
+      "category_coverage": 0.5818181818181818,
+      "novelty": 11.290789592880083,
+      "price_dispersion": 0.8962448741948729
+    },
+    {
+      "config": {
+        "k": 10,
+        "relevance_weight": 0.9,
+        "novelty_weight": 0.0,
+        "semantic_similarity_weight": 0.7,
+        "category_similarity_weight": 0.2,
+        "price_similarity_weight": 0.1
+      },
+      "ranking_seconds": 7.801193605999288,
+      "recall_at_k": 0.0899,
+      "ndcg_at_k": 0.048956302161635226,
+      "mrr_at_k": 0.036527420634920635,
+      "catalog_coverage": 0.08598738590512008,
+      "intra_list_diversity": 0.48024182318747044,
+      "category_variety": 0.6191800000000001,
+      "category_coverage": 0.5818181818181818,
+      "novelty": 11.276438789309438,
+      "price_dispersion": 0.8977760999942584
+    },
+    {
+      "config": {
+        "k": 10,
+        "relevance_weight": 0.9,
+        "novelty_weight": 0.025,
+        "semantic_similarity_weight": 0.7,
+        "category_similarity_weight": 0.2,
+        "price_similarity_weight": 0.1
+      },
+      "ranking_seconds": 7.457617534993915,
+      "recall_at_k": 0.0899,
+      "ndcg_at_k": 0.048879086790161855,
+      "mrr_at_k": 0.036430873015873014,
+      "catalog_coverage": 0.08606573432052336,
+      "intra_list_diversity": 0.48004295027107,
+      "category_variety": 0.6190399999999999,
+      "category_coverage": 0.5818181818181818,
+      "novelty": 11.283079318986188,
+      "price_dispersion": 0.8978425145587057
+    },
+    {
+      "config": {
+        "k": 10,
+        "relevance_weight": 0.9,
+        "novelty_weight": 0.05,
+        "semantic_similarity_weight": 0.7,
+        "category_similarity_weight": 0.2,
+        "price_similarity_weight": 0.1
+      },
+      "ranking_seconds": 7.795589458997711,
+      "recall_at_k": 0.0901,
+      "ndcg_at_k": 0.04897765097213071,
+      "mrr_at_k": 0.0365109126984127,
+      "catalog_coverage": 0.08630077956673327,
+      "intra_list_diversity": 0.4799050493374467,
+      "category_variety": 0.61901,
+      "category_coverage": 0.5818181818181818,
+      "novelty": 11.289491065150816,
+      "price_dispersion": 0.8976512004243843
+    },
+    {
+      "config": {
+        "k": 10,
+        "relevance_weight": 0.85,
+        "novelty_weight": 0.0,
+        "semantic_similarity_weight": 0.7,
+        "category_similarity_weight": 0.2,
+        "price_similarity_weight": 0.1
+      },
+      "ranking_seconds": 7.449476834000961,
+      "recall_at_k": 0.0899,
+      "ndcg_at_k": 0.04896564865015203,
+      "mrr_at_k": 0.03652869047619047,
+      "catalog_coverage": 0.08586986328201512,
+      "intra_list_diversity": 0.4817920372903347,
+      "category_variety": 0.62952,
+      "category_coverage": 0.5818181818181818,
+      "novelty": 11.271562697249141,
+      "price_dispersion": 0.9022159574434784
+    },
+    {
+      "config": {
+        "k": 10,
+        "relevance_weight": 0.85,
+        "novelty_weight": 0.025,
+        "semantic_similarity_weight": 0.7,
+        "category_similarity_weight": 0.2,
+        "price_similarity_weight": 0.1
+      },
+      "ranking_seconds": 7.739397318997362,
+      "recall_at_k": 0.0897,
+      "ndcg_at_k": 0.048877960460490553,
+      "mrr_at_k": 0.036472380952380944,
+      "catalog_coverage": 0.08590903748971677,
+      "intra_list_diversity": 0.48161331614553926,
+      "category_variety": 0.62955,
+      "category_coverage": 0.5818181818181818,
+      "novelty": 11.27792149497205,
+      "price_dispersion": 0.9020782354586212
+    },
+    {
+      "config": {
+        "k": 10,
+        "relevance_weight": 0.85,
+        "novelty_weight": 0.05,
+        "semantic_similarity_weight": 0.7,
+        "category_similarity_weight": 0.2,
+        "price_similarity_weight": 0.1
+      },
+      "ranking_seconds": 7.635622014000546,
+      "recall_at_k": 0.0897,
+      "ndcg_at_k": 0.048875682798447805,
+      "mrr_at_k": 0.03648420634920634,
+      "catalog_coverage": 0.08594821169741843,
+      "intra_list_diversity": 0.48148511257469656,
+      "category_variety": 0.6298,
+      "category_coverage": 0.5818181818181818,
+      "novelty": 11.285004673079738,
+      "price_dispersion": 0.9024994997051256
+    }
+  ],
+  "full_validation_baseline": {
+    "recall_at_k": 0.08676473691986239,
+    "ndcg_at_k": 0.04714624149420546,
+    "mrr_at_k": 0.03511039184885241,
+    "catalog_coverage": 0.10052101696243193,
+    "intra_list_diversity": 0.4776803021984194,
+    "category_variety": 0.6028302484118107,
+    "category_coverage": 0.6045454545454545,
+    "novelty": 11.278102068218322,
+    "price_dispersion": 0.8942462690851293
+  },
+  "full_validation_selected": {
+    "recall_at_k": 0.08694413372448873,
+    "ndcg_at_k": 0.04724498774009959,
+    "mrr_at_k": 0.03518283314958143,
+    "catalog_coverage": 0.10056019117013358,
+    "intra_list_diversity": 0.48178208699710023,
+    "category_variety": 0.6293440408602604,
+    "category_coverage": 0.6068181818181818,
+    "novelty": 11.264706807096259,
+    "price_dispersion": 0.9061924163576986
+  },
+  "full_validation_delta": {
+    "recall_at_k": 0.00017939680462633611,
+    "ndcg_at_k": 9.874624589412823e-05,
+    "mrr_at_k": 7.244130072901755e-05,
+    "catalog_coverage": 3.9174207701650476e-05,
+    "intra_list_diversity": 0.004101784798680841,
+    "category_variety": 0.026513792448449758,
+    "category_coverage": 0.002272727272727315,
+    "novelty": -0.013395261122063573,
+    "price_dispersion": 0.011946147272569374
+  },
+  "full_validation_relevance_seconds": 4.255607341998257,
+  "full_validation_rerank_seconds": 73.46298724199733
+}

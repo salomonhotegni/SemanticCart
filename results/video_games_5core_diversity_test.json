@@ -1,0 +1,60 @@
+{
+  "dataset": "video_games_5core",
+  "model": "returning_user_diversity_reranker",
+  "evaluation_split": "test",
+  "fit_splits": [
+    "train",
+    "validation"
+  ],
+  "selection_split": "validation",
+  "test_used_for_tuning": false,
+  "test_ground_truth_loaded_after_ranking": true,
+  "k": 10,
+  "candidate_k": 25,
+  "candidate_users": 94762,
+  "candidate_rows": 2369050,
+  "selected_session_weight": 0.5,
+  "selected_diversity_config": {
+    "k": 10,
+    "relevance_weight": 0.85,
+    "novelty_weight": 0.0,
+    "semantic_similarity_weight": 0.7,
+    "category_similarity_weight": 0.2,
+    "price_similarity_weight": 0.1
+  },
+  "relevance_ranking_seconds": 4.02612670599774,
+  "diversity_reranking_seconds": 74.0304505200038,
+  "baseline_metrics": {
+    "recall_at_k": 0.07600092864228278,
+    "ndcg_at_k": 0.04223231411235209,
+    "mrr_at_k": 0.03196367390585537,
+    "catalog_coverage": 0.09921875,
+    "intra_list_diversity": 0.4799019509300551,
+    "category_variety": 0.6124744095734578,
+    "category_coverage": 0.6045454545454545,
+    "novelty": 11.26284700858998,
+    "price_dispersion": 0.9071428330637168
+  },
+  "selected_metrics": {
+    "recall_at_k": 0.07612756168084253,
+    "ndcg_at_k": 0.042312832720723954,
+    "mrr_at_k": 0.03202959930023521,
+    "catalog_coverage": 0.0988671875,
+    "intra_list_diversity": 0.484084672213987,
+    "category_variety": 0.639219307317279,
+    "category_coverage": 0.6045454545454545,
+    "novelty": 11.249758147126103,
+    "price_dispersion": 0.9182657287558909
+  },
+  "delta_vs_relevance_baseline": {
+    "recall_at_k": 0.0001266330385597536,
+    "ndcg_at_k": 8.051860837186148e-05,
+    "mrr_at_k": 6.592539437984268e-05,
+    "catalog_coverage": -0.00035156249999999944,
+    "intra_list_diversity": 0.004182721283931878,
+    "category_variety": 0.026744897743821272,
+    "category_coverage": 0.0,
+    "novelty": -0.013088861463876,
+    "price_dispersion": 0.011122895692174062
+  }
+}
