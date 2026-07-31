@@ -1,6 +1,7 @@
 """Build the held-out test comparison and generalization report."""
 
 import json
+from dataclasses import dataclass
 from math import isclose
 from pathlib import Path
 
@@ -12,46 +13,92 @@ CSV_PATH = RESULTS_DIR / "video_games_5core_final_test.csv"
 MARKDOWN_PATH = RESULTS_DIR / "video_games_5core_final_test.md"
 K = 10
 
-TEST_SPECS = [
-    (
-        "Collaborative ALS",
-        RESULTS_DIR / "video_games_5core_als_test.json",
-        "64 latent factors",
+
+@dataclass(frozen=True)
+class ModelSpec:
+    """Describe one model result and its metric schema."""
+
+    name: str
+    test_path: Path
+    validation_path: Path
+    notes: str
+    timing_kind: str
+    test_metrics_key: str | None = None
+    validation_metrics_key: str | None = None
+
+
+DIVERSITY_TEST_PATH = (
+    RESULTS_DIR / "video_games_5core_diversity_test.json"
+)
+DIVERSITY_TUNING_PATH = (
+    RESULTS_DIR / "video_games_5core_diversity_tuning.json"
+)
+
+MODEL_SPECS = [
+    ModelSpec(
+        name="Collaborative ALS",
+        test_path=RESULTS_DIR / "video_games_5core_als_test.json",
+        validation_path=RESULTS_DIR / "video_games_5core_als.json",
+        notes="64 latent factors",
+        timing_kind="candidate_generation",
     ),
-    (
-        "OpenAI content",
-        RESULTS_DIR / "video_games_5core_openai_semantic_test.json",
-        "512d embeddings with FAISS HNSW",
+    ModelSpec(
+        name="OpenAI content",
+        test_path=(
+            RESULTS_DIR
+            / "video_games_5core_openai_semantic_test.json"
+        ),
+        validation_path=(
+            RESULTS_DIR
+            / "video_games_5core_openai_semantic.json"
+        ),
+        notes="512d embeddings with FAISS HNSW",
+        timing_kind="candidate_generation",
     ),
-    (
-        "Long-term hybrid",
-        RESULTS_DIR / "video_games_5core_hybrid_test.json",
-        "ALS Top-10 reranked by long-term semantics; weight 0.6",
+    ModelSpec(
+        name="Long-term hybrid",
+        test_path=RESULTS_DIR / "video_games_5core_hybrid_test.json",
+        validation_path=RESULTS_DIR / "video_games_5core_hybrid.json",
+        notes="ALS Top-10 reranked by long-term semantics; weight 0.6",
+        timing_kind="legacy_reranking",
     ),
-    (
-        "Returning-user hybrid",
-        RESULTS_DIR / "video_games_5core_returning_user_test.json",
-        "ALS Top-10 reranked by one-item session intent; weight 0.5",
+    ModelSpec(
+        name="Returning-user hybrid",
+        test_path=(
+            RESULTS_DIR
+            / "video_games_5core_returning_user_test.json"
+        ),
+        validation_path=(
+            RESULTS_DIR
+            / "video_games_5core_returning_user_tuning.json"
+        ),
+        notes="ALS Top-10 reranked by one-item session intent; weight 0.5",
+        timing_kind="legacy_reranking",
+        validation_metrics_key="best_validation_result",
+    ),
+    ModelSpec(
+        name="Top-25 returning-user",
+        test_path=DIVERSITY_TEST_PATH,
+        validation_path=DIVERSITY_TUNING_PATH,
+        notes="Top-10 selected from 25 ALS candidates; session weight 0.5",
+        timing_kind="deep_relevance",
+        test_metrics_key="baseline_metrics",
+        validation_metrics_key="full_validation_baseline",
+    ),
+    ModelSpec(
+        name="Diversity-aware reranker",
+        test_path=DIVERSITY_TEST_PATH,
+        validation_path=DIVERSITY_TUNING_PATH,
+        notes="MMR with semantic, category, and price redundancy",
+        timing_kind="diversity_reranking",
+        test_metrics_key="selected_metrics",
+        validation_metrics_key="full_validation_selected",
     ),
 ]
 
-VALIDATION_PATHS = {
-    "Collaborative ALS": RESULTS_DIR / "video_games_5core_als.json",
-    "OpenAI content": (
-        RESULTS_DIR / "video_games_5core_openai_semantic.json"
-    ),
-    "Long-term hybrid": (
-        RESULTS_DIR / "video_games_5core_hybrid.json"
-    ),
-    "Returning-user hybrid": (
-        RESULTS_DIR
-        / "video_games_5core_returning_user_tuning.json"
-    ),
-}
-
 
 def load_result(path: Path) -> dict:
-    """Load one tracked JSON result."""
+    """Load one required tracked JSON result."""
     if not path.exists():
         raise FileNotFoundError(f"Missing result: {path}")
 
@@ -59,20 +106,35 @@ def load_result(path: Path) -> dict:
         return json.load(source)
 
 
-def relative_change(new_value: float, baseline: float) -> float:
+def metric_block(
+    result: dict,
+    key: str | None,
+) -> dict:
+    """Extract flat or nested ranking metrics."""
+    return result if key is None else result[key]
+
+
+def relative_change(
+    new_value: float,
+    baseline: float,
+) -> float:
     """Return percentage change relative to a baseline."""
     return 100.0 * (new_value / baseline - 1.0)
 
 
 def timing_fields(
-    model: str,
+    spec: ModelSpec,
     result: dict,
 ) -> tuple[str, float, float]:
-    """Return explicitly scoped bulk-stage timing."""
-    if model in {
-        "Long-term hybrid",
-        "Returning-user hybrid",
-    }:
+    """Return explicitly scoped offline bulk-stage timing."""
+    if spec.timing_kind == "candidate_generation":
+        return (
+            "candidate generation",
+            result["recommendation_seconds"],
+            result["recommendation_users_per_second"],
+        )
+
+    if spec.timing_kind == "legacy_reranking":
         seconds = result["ranking_seconds"]
         users = result.get("candidate_users")
 
@@ -82,36 +144,58 @@ def timing_fields(
                 / result["k"]
             )
 
-        return "reranking only", seconds, users / seconds
+        return "Top-10 reranking only", seconds, users / seconds
 
-    return (
-        "candidate generation",
-        result["recommendation_seconds"],
-        result["recommendation_users_per_second"],
+    users = result["candidate_users"]
+
+    if spec.timing_kind == "deep_relevance":
+        seconds = result["relevance_ranking_seconds"]
+        return (
+            "Top-25 relevance reranking only",
+            seconds,
+            users / seconds,
+        )
+
+    if spec.timing_kind == "diversity_reranking":
+        seconds = result["diversity_reranking_seconds"]
+        return (
+            "MMR Top-10 selection only",
+            seconds,
+            users / seconds,
+        )
+
+    raise ValueError(
+        f"Unknown timing kind: {spec.timing_kind}"
     )
 
 
-def validate_test_protocol(model: str, result: dict) -> None:
+def validate_test_protocol(
+    spec: ModelSpec,
+    result: dict,
+) -> None:
     """Reject results that do not follow the frozen test protocol."""
     if result.get("evaluation_split") != "test":
-        raise ValueError(f"{model} is not a test result.")
-
+        raise ValueError(
+            f"{spec.name} is not a test result."
+        )
     if result.get("test_used_for_tuning") is not False:
-        raise ValueError(f"{model} does not declare frozen tuning.")
-
+        raise ValueError(
+            f"{spec.name} does not declare frozen tuning."
+        )
     if result.get("k") != K:
-        raise ValueError(f"{model} does not use K={K}.")
-
+        raise ValueError(
+            f"{spec.name} does not use K={K}."
+        )
     if result.get("fit_splits") != ["train", "validation"]:
         raise ValueError(
-            f"{model} was not fitted through validation."
+            f"{spec.name} was not fitted through validation."
         )
-    if model == "Returning-user hybrid":
+
+    if spec.name == "Returning-user hybrid":
         if result.get("session_weight") != 0.5:
             raise ValueError(
                 "Returning-user weight does not match validation."
             )
-
         if (
             result.get(
                 "test_ground_truth_loaded_after_ranking"
@@ -122,63 +206,124 @@ def validate_test_protocol(model: str, result: dict) -> None:
                 "Returning-user labels were not loaded after ranking."
             )
 
+    if spec.test_path == DIVERSITY_TEST_PATH:
+        if result.get("candidate_k") != 25:
+            raise ValueError(
+                "Diversity result does not use Top-25 candidates."
+            )
+        if result.get("selected_session_weight") != 0.5:
+            raise ValueError(
+                "Deep session weight does not match validation."
+            )
+        if (
+            result.get(
+                "test_ground_truth_loaded_after_ranking"
+            )
+            is not True
+        ):
+            raise ValueError(
+                "Diversity labels were not loaded after ranking."
+            )
+
+
+def validate_frozen_diversity(
+    test_result: dict,
+    tuning_result: dict,
+) -> None:
+    """Confirm test diversity settings equal validation selections."""
+    if tuning_result.get("selection_split") != "validation":
+        raise ValueError(
+            "Diversity tuning did not use validation."
+        )
+    if tuning_result.get("test_used_for_tuning") is not False:
+        raise ValueError(
+            "Diversity tuning does not exclude test."
+        )
+    if (
+        test_result["selected_session_weight"]
+        != tuning_result["selected_session_weight"]
+    ):
+        raise ValueError(
+            "Diversity session weight changed on test."
+        )
+    if (
+        test_result["selected_diversity_config"]
+        != tuning_result["selected_diversity_config"]
+    ):
+        raise ValueError(
+            "Diversity configuration changed on test."
+        )
+
 
 def main() -> None:
-
     """Generate final CSV and portfolio-facing Markdown reports."""
     rows = []
-    test_results = {}
-    validation_results = {}
+    test_metrics = {}
+    validation_metrics = {}
+    raw_test_results = {}
 
-    for model, path, notes in TEST_SPECS:
-        result = load_result(path)
-        validate_test_protocol(model, result)
-        test_results[model] = result
+    for spec in MODEL_SPECS:
+        test_result = load_result(spec.test_path)
+        validation_result = load_result(
+            spec.validation_path
+        )
+
+        validate_test_protocol(spec, test_result)
+
+        if spec.test_path == DIVERSITY_TEST_PATH:
+            validate_frozen_diversity(
+                test_result,
+                validation_result,
+            )
+
+        test = metric_block(
+            test_result,
+            spec.test_metrics_key,
+        )
+        validation = metric_block(
+            validation_result,
+            spec.validation_metrics_key,
+        )
+
+        test_metrics[spec.name] = test
+        validation_metrics[spec.name] = validation
+        raw_test_results[spec.name] = test_result
 
         timing_scope, seconds, throughput = timing_fields(
-            model,
-            result,
+            spec,
+            test_result,
         )
 
         rows.append(
             {
-                "model": model,
-                "recall_at_10": result["recall_at_k"],
-                "ndcg_at_10": result["ndcg_at_k"],
-                "mrr_at_10": result["mrr_at_k"],
-                "catalog_coverage": result[
+                "model": spec.name,
+                "recall_at_10": test["recall_at_k"],
+                "ndcg_at_10": test["ndcg_at_k"],
+                "mrr_at_10": test["mrr_at_k"],
+                "catalog_coverage": test[
                     "catalog_coverage"
                 ],
                 "timing_scope": timing_scope,
                 "stage_seconds": seconds,
                 "stage_users_per_second": throughput,
-                "notes": notes,
-                "result_path": path.as_posix(),
+                "notes": spec.notes,
+                "result_path": spec.test_path.as_posix(),
             }
         )
 
-        validation_result = load_result(
-            VALIDATION_PATHS[model]
-        )
+    als = test_metrics["Collaborative ALS"]
+    semantic = test_metrics["OpenAI content"]
+    long_term = test_metrics["Long-term hybrid"]
+    returning = test_metrics["Returning-user hybrid"]
+    deep_relevance = test_metrics["Top-25 returning-user"]
+    diversified = test_metrics["Diversity-aware reranker"]
 
-        if model == "Returning-user hybrid":
-            validation_result = validation_result[
-                "best_validation_result"
-            ]
+    for name in (
+        "Long-term hybrid",
+        "Returning-user hybrid",
+    ):
+        reranker = test_metrics[name]
 
-        validation_results[model] = validation_result
-
-    als = test_results["Collaborative ALS"]
-    semantic = test_results["OpenAI content"]
-    long_term_hybrid = test_results["Long-term hybrid"]
-    returning_hybrid = test_results["Returning-user hybrid"]
-
-    rerankers = {
-        "Long-term hybrid": long_term_hybrid,
-        "Returning-user hybrid": returning_hybrid,
-    }
-
-    for model, reranker in rerankers.items():
         if not isclose(
             reranker["recall_at_k"],
             als["recall_at_k"],
@@ -186,9 +331,8 @@ def main() -> None:
             abs_tol=1e-12,
         ):
             raise ValueError(
-                f"{model} does not preserve ALS Recall@10."
+                f"{name} does not preserve ALS Recall@10."
             )
-
         if not isclose(
             reranker["catalog_coverage"],
             als["catalog_coverage"],
@@ -196,7 +340,7 @@ def main() -> None:
             abs_tol=1e-12,
         ):
             raise ValueError(
-                f"{model} does not preserve ALS coverage."
+                f"{name} does not preserve ALS coverage."
             )
 
     table = pd.DataFrame(rows)
@@ -216,8 +360,8 @@ def main() -> None:
         ),
         (
             "See the complete "
-            "[validation ablation](video_games_5core_ablation.md) for "
-            "popularity, TF-IDF, OpenAI, ALS, and hybrid comparisons."
+            "[validation ablation](video_games_5core_ablation.md) and "
+            "[diversity report](video_games_5core_diversity.md)."
         ),
         "",
         "## Held-Out Ranking Quality",
@@ -252,16 +396,16 @@ def main() -> None:
         ]
     )
 
-    for model, _, _ in TEST_SPECS:
-        validation = validation_results[model]
-        test = test_results[model]
+    for spec in MODEL_SPECS:
+        validation = validation_metrics[spec.name]
+        test = test_metrics[spec.name]
         ndcg_change = relative_change(
             test["ndcg_at_k"],
             validation["ndcg_at_k"],
         )
 
         lines.append(
-            f"| {model} "
+            f"| {spec.name} "
             f"| {validation['recall_at_k']:.6f} "
             f"| {test['recall_at_k']:.6f} "
             f"| {validation['ndcg_at_k']:.6f} "
@@ -287,27 +431,31 @@ def main() -> None:
             f"| {row['stage_users_per_second']:,.0f} |"
         )
 
-    long_term_ndcg_gain = relative_change(
-        long_term_hybrid["ndcg_at_k"],
+    final_recall_gain = relative_change(
+        diversified["recall_at_k"],
+        als["recall_at_k"],
+    )
+    final_ndcg_gain = relative_change(
+        diversified["ndcg_at_k"],
         als["ndcg_at_k"],
     )
-    long_term_mrr_gain = relative_change(
-        long_term_hybrid["mrr_at_k"],
+    final_mrr_gain = relative_change(
+        diversified["mrr_at_k"],
         als["mrr_at_k"],
     )
-    returning_ndcg_gain = relative_change(
-        returning_hybrid["ndcg_at_k"],
-        als["ndcg_at_k"],
+    final_coverage_gain = relative_change(
+        diversified["catalog_coverage"],
+        als["catalog_coverage"],
     )
-    returning_mrr_gain = relative_change(
-        returning_hybrid["mrr_at_k"],
-        als["mrr_at_k"],
+    depth_ndcg_gain = relative_change(
+        deep_relevance["ndcg_at_k"],
+        returning["ndcg_at_k"],
     )
-    returning_vs_long_term_ndcg = relative_change(
-        returning_hybrid["ndcg_at_k"],
-        long_term_hybrid["ndcg_at_k"],
+    diversity_ndcg_gain = relative_change(
+        diversified["ndcg_at_k"],
+        deep_relevance["ndcg_at_k"],
     )
-    coverage_ratio = (
+    semantic_coverage_ratio = (
         semantic["catalog_coverage"]
         / als["catalog_coverage"]
     )
@@ -316,42 +464,39 @@ def main() -> None:
         [
             "",
             (
-                "Hybrid timings measure reranking after candidates already "
-                "exist, not end-to-end serving latency."
+                "Timing rows measure different offline bulk stages and are "
+                "not end-to-end serving latency."
             ),
             "",
             "## Findings",
             "",
             (
-                f"- Long-term semantic reranking improves test NDCG@10 by "
-                f"{long_term_ndcg_gain:.3f}% and MRR@10 by "
-                f"{long_term_mrr_gain:.3f}% over ALS."
+                f"- The final diversity-aware model improves Recall@10 by "
+                f"{final_recall_gain:.3f}%, NDCG@10 by "
+                f"{final_ndcg_gain:.3f}%, and MRR@10 by "
+                f"{final_mrr_gain:.3f}% over ALS."
             ),
             (
-                f"- Recent-session reranking improves test NDCG@10 by "
-                f"{returning_ndcg_gain:.3f}% and MRR@10 by "
-                f"{returning_mrr_gain:.3f}% over ALS."
+                f"- Final catalogue coverage is "
+                f"{final_coverage_gain:.3f}% higher than ALS coverage."
             ),
             (
-                f"- Recent-session intent improves NDCG@10 by another "
-                f"{returning_vs_long_term_ndcg:.3f}% over the long-term "
-                "semantic hybrid."
+                f"- Expanding the returning-user candidate pool from 10 to "
+                f"25 improves NDCG@10 by {depth_ndcg_gain:.3f}%."
             ),
             (
-                "- Both conservative rerankers preserve ALS Recall@10 and "
-                "catalogue coverage exactly."
+                f"- Frozen MMR adds another "
+                f"{diversity_ndcg_gain:.3f}% NDCG@10 while improving "
+                "semantic and category diversity."
             ),
             (
-                f"- OpenAI semantic retrieval covers {coverage_ratio:.1f}x "
-                "as much of the fit catalogue as ALS."
+                f"- OpenAI semantic retrieval covers "
+                f"{semantic_coverage_ratio:.1f}x as much of the fit "
+                "catalogue as ALS."
             ),
             (
-                "- All four models score lower on the later test horizon, "
+                "- All six models score lower on the later test horizon, "
                 "showing why chronological holdout evaluation matters."
-            ),
-            (
-                "- Returning-user timing reports reranking only; direct "
-                "session candidate scoring is measured separately."
             ),
             (
                 "- Online p50 and p95 latency remain unreported until the "
