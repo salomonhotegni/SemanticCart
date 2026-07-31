@@ -1,5 +1,6 @@
 import pandas as pd
 import pytest
+import numpy as np
 
 from semanticcart.collaborative import ALSConfig, ALSRecommender
 
@@ -93,3 +94,74 @@ def test_model_artifacts_are_saved(trained_model, tmp_path):
     assert (tmp_path / "als_model.npz").exists()
     assert (tmp_path / "users.parquet").exists()
     assert (tmp_path / "items.parquet").exists()
+    assert (tmp_path / "user_items.npz").exists()
+    assert (tmp_path / "config.json").exists()
+
+
+def test_saved_model_round_trip_preserves_recommendations(
+    trained_model,
+    tmp_path,
+):
+    model, _ = trained_model
+    model.save(tmp_path)
+
+    loaded = ALSRecommender.load(tmp_path)
+
+    assert loaded.config == model.config
+    assert np.array_equal(
+        loaded.user_ids,
+        model.user_ids,
+    )
+    assert np.array_equal(
+        loaded.item_ids,
+        model.item_ids,
+    )
+    assert (
+        loaded.user_items != model.user_items
+    ).nnz == 0
+
+    expected = model.recommend_for_users(
+        ["u1", "u2"],
+        k=2,
+    )
+    actual = loaded.recommend_for_users(
+        ["u1", "u2"],
+        k=2,
+    )
+
+    assert actual[
+        ["user_id", "item_id", "rank"]
+    ].equals(
+        expected[["user_id", "item_id", "rank"]]
+    )
+    np.testing.assert_allclose(
+        actual["collaborative_score"],
+        expected["collaborative_score"],
+    )
+
+
+def test_load_rejects_missing_artifacts(tmp_path):
+    with pytest.raises(
+        FileNotFoundError,
+        match="Missing ALS artifacts",
+    ):
+        ALSRecommender.load(tmp_path)
+
+
+def test_load_rejects_noncontiguous_mapping(
+    trained_model,
+    tmp_path,
+):
+    model, _ = trained_model
+    model.save(tmp_path)
+
+    users_path = tmp_path / "users.parquet"
+    users = pd.read_parquet(users_path)
+    users.loc[0, "user_index"] = len(users) + 1
+    users.to_parquet(users_path, index=False)
+
+    with pytest.raises(
+        ValueError,
+        match="Mapping indexes must be contiguous",
+    ):
+        ALSRecommender.load(tmp_path)

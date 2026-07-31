@@ -1,13 +1,18 @@
 """Train and serve an implicit-feedback ALS collaborative recommender."""
 
 from collections.abc import Iterable
-from dataclasses import dataclass
+import json
+from dataclasses import asdict, dataclass
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
 from implicit.cpu.als import AlternatingLeastSquares
-from scipy.sparse import csr_matrix
+from scipy.sparse import (
+    csr_matrix,
+    load_npz,
+    save_npz,
+)
 from threadpoolctl import threadpool_limits
 
 
@@ -30,6 +35,57 @@ class ALSConfig:
     iterations: int = 20
     random_state: int = 42
     batch_size: int = 1024
+
+
+def _load_id_mapping(
+    path: Path,
+    index_column: str,
+    id_column: str,
+) -> np.ndarray:
+    """Load and validate one contiguous model ID mapping."""
+    frame = pd.read_parquet(path)
+    required = {index_column, id_column}
+    missing = required - set(frame.columns)
+
+    if missing:
+        raise ValueError(
+            f"Missing mapping columns in {path.name}: "
+            f"{sorted(missing)}"
+        )
+
+    frame[index_column] = pd.to_numeric(
+        frame[index_column],
+        errors="coerce",
+    )
+
+    if frame[[index_column, id_column]].isna().any().any():
+        raise ValueError(
+            f"Mapping values cannot be missing in {path.name}."
+        )
+    if frame[index_column].duplicated().any():
+        raise ValueError(
+            f"Mapping indexes must be unique in {path.name}."
+        )
+
+    frame = frame.sort_values(index_column)
+    expected_indexes = np.arange(len(frame))
+
+    if not np.array_equal(
+        frame[index_column].to_numpy(),
+        expected_indexes,
+    ):
+        raise ValueError(
+            f"Mapping indexes must be contiguous in {path.name}."
+        )
+
+    identifiers = frame[id_column].astype(str)
+
+    if identifiers.duplicated().any():
+        raise ValueError(
+            f"Mapping IDs must be unique in {path.name}."
+        )
+
+    return identifiers.to_numpy()
 
 
 class ALSRecommender:
@@ -225,6 +281,101 @@ class ALSRecommender:
 
         return pd.concat(recommendation_frames, ignore_index=True)
 
+    @classmethod
+    def load(
+        cls,
+        directory: str | Path,
+    ) -> "ALSRecommender":
+        """Load a complete persisted ALS recommender.
+
+        Args:
+            directory: Directory containing the model, sparse interaction
+                matrix, ID mappings, and configuration.
+
+        Returns:
+            A recommender ready for batched unseen-item retrieval.
+
+        Raises:
+            FileNotFoundError: If any required artifact is missing.
+            ValueError: If mappings, configuration, or shapes are invalid.
+        """
+        directory = Path(directory)
+        paths = {
+            "model": directory / "als_model.npz",
+            "user_items": directory / "user_items.npz",
+            "users": directory / "users.parquet",
+            "items": directory / "items.parquet",
+            "config": directory / "config.json",
+        }
+
+        missing = [
+            path.name
+            for path in paths.values()
+            if not path.exists()
+        ]
+
+        if missing:
+            raise FileNotFoundError(
+                f"Missing ALS artifacts: {sorted(missing)}"
+            )
+
+        with paths["config"].open(
+            encoding="utf-8",
+        ) as source:
+            config_values = json.load(source)
+
+        try:
+            config = ALSConfig(**config_values)
+        except TypeError as error:
+            raise ValueError(
+                "Invalid ALS configuration artifact."
+            ) from error
+
+        model = AlternatingLeastSquares.load(
+            str(paths["model"])
+        )
+        user_items = load_npz(
+            paths["user_items"]
+        ).tocsr().astype(np.float32)
+
+        user_ids = _load_id_mapping(
+            paths["users"],
+            "user_index",
+            "user_id",
+        )
+        item_ids = _load_id_mapping(
+            paths["items"],
+            "item_index",
+            "item_id",
+        )
+
+        expected_shape = (
+            len(user_ids),
+            len(item_ids),
+        )
+
+        if user_items.shape != expected_shape:
+            raise ValueError(
+                f"User-item matrix has shape {user_items.shape}; "
+                f"expected {expected_shape}."
+            )
+        if model.user_factors.shape[0] != len(user_ids):
+            raise ValueError(
+                "User factors do not match the user mapping."
+            )
+        if model.item_factors.shape[0] != len(item_ids):
+            raise ValueError(
+                "Item factors do not match the item mapping."
+            )
+
+        return cls(
+            model=model,
+            user_items=user_items,
+            user_ids=user_ids,
+            item_ids=item_ids,
+            config=config,
+        )
+
     def save(self, directory: str | Path) -> None:
         """Persist the ALS model and row-to-ID mappings.
 
@@ -237,6 +388,19 @@ class ALSRecommender:
         directory.mkdir(parents=True, exist_ok=True)
 
         self.model.save(str(directory / "als_model.npz"))
+        save_npz(
+            directory / "user_items.npz",
+            self.user_items,
+        )
+
+        with (
+            directory / "config.json"
+        ).open("w", encoding="utf-8") as output:
+            json.dump(
+                asdict(self.config),
+                output,
+                indent=2,
+            )
 
         pd.DataFrame(
             {
