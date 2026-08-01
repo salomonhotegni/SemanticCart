@@ -1,0 +1,58 @@
+{
+  "benchmark": "semanticcart_http_recommendation_latency",
+  "created_at_utc": "2026-08-01T22:58:56.546576+00:00",
+  "base_url": "http://127.0.0.1:8000",
+  "transport": "HTTP/1.1 loopback",
+  "server_process": "one warm Uvicorn worker",
+  "startup_and_model_load_excluded": true,
+  "connection_reuse": true,
+  "request_count_per_scenario": 500,
+  "warmup_requests_per_scenario": 25,
+  "random_seed": 42,
+  "interaction_source": "data/processed/amazon_video_games_5core/test.parquet",
+  "available_test_users": 94762,
+  "model_version": "semanticcart-c5ef1c664d715a32",
+  "dataset": "video_games_5core",
+  "client_environment": {
+    "python": "3.12.2",
+    "platform": "Linux-5.15.167.4-microsoft-standard-WSL2-x86_64-with-glibc2.35",
+    "httpx2": "2.9.1"
+  },
+  "scenarios": [
+    {
+      "concurrency": 1,
+      "workload": "returning_user_recent_profile",
+      "k": 10,
+      "requests": 500,
+      "wall_seconds": 23.264834036002867,
+      "requests_per_second": 21.491664166881158,
+      "mean_ms": 46.462307679999995,
+      "standard_deviation_ms": 2.538015129091553,
+      "minimum_ms": 41.108973,
+      "p50_ms": 46.3137015,
+      "p95_ms": 49.782844399999995,
+      "p99_ms": 54.17331303999999,
+      "maximum_ms": 76.69527
+    },
+    {
+      "concurrency": 8,
+      "workload": "returning_user_recent_profile",
+      "k": 10,
+      "requests": 500,
+      "wall_seconds": 47.48846626801242,
+      "requests_per_second": 10.528872361935875,
+      "mean_ms": 758.121540268,
+      "standard_deviation_ms": 42.0195885736252,
+      "minimum_ms": 284.671492,
+      "p50_ms": 757.3042820000001,
+      "p95_ms": 813.65796515,
+      "p99_ms": 842.6290158099999,
+      "maximum_ms": 921.502466
+    }
+  ],
+  "notes": [
+    "Measurements include HTTP serialization, routing, inference, reranking, and response deserialization.",
+    "Measurements use local loopback and do not include internet or cross-host network latency.",
+    "Returning users use persisted recent profiles; no live session events are submitted."
+  ]
+}

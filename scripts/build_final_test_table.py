@@ -33,6 +33,10 @@ DIVERSITY_TEST_PATH = (
 DIVERSITY_TUNING_PATH = (
     RESULTS_DIR / "video_games_5core_diversity_tuning.json"
 )
+LATENCY_PATH = (
+    RESULTS_DIR
+    / "video_games_5core_api_latency.json"
+)
 
 MODEL_SPECS = [
     ModelSpec(
@@ -104,6 +108,56 @@ def load_result(path: Path) -> dict:
 
     with path.open(encoding="utf-8") as source:
         return json.load(source)
+
+
+def serving_latency_scenario(
+    report: dict,
+    concurrency: int,
+) -> dict:
+    """Return one validated online serving scenario."""
+    if report.get("benchmark") != (
+        "semanticcart_http_recommendation_latency"
+    ):
+        raise ValueError(
+            "Unexpected serving-latency benchmark."
+        )
+    if report.get(
+        "startup_and_model_load_excluded"
+    ) is not True:
+        raise ValueError(
+            "Serving latency must describe a warm model."
+        )
+
+    matches = [
+        scenario
+        for scenario in report.get(
+            "scenarios",
+            [],
+        )
+        if scenario.get("concurrency")
+        == concurrency
+    ]
+
+    if len(matches) != 1:
+        raise ValueError(
+            f"Expected one concurrency={concurrency} "
+            "latency scenario."
+        )
+
+    scenario = matches[0]
+
+    if scenario.get("k") != K:
+        raise ValueError(
+            "Serving benchmark K does not match evaluation K."
+        )
+    if scenario.get("workload") != (
+        "returning_user_recent_profile"
+    ):
+        raise ValueError(
+            "Unexpected serving workload."
+        )
+
+    return scenario
 
 
 def metric_block(
@@ -261,6 +315,21 @@ def main() -> None:
     test_metrics = {}
     validation_metrics = {}
     raw_test_results = {}
+    latency_report = load_result(
+        LATENCY_PATH
+    )
+    low_load_latency = (
+        serving_latency_scenario(
+            latency_report,
+            concurrency=1,
+        )
+    )
+    concurrent_latency = (
+        serving_latency_scenario(
+            latency_report,
+            concurrency=8,
+        )
+    )
 
     for spec in MODEL_SPECS:
         test_result = load_result(spec.test_path)
@@ -293,6 +362,10 @@ def main() -> None:
             spec,
             test_result,
         )
+        is_deployed_model = (
+            spec.name
+            == "Diversity-aware reranker"
+        )
 
         rows.append(
             {
@@ -303,6 +376,16 @@ def main() -> None:
                 "catalog_coverage": test[
                     "catalog_coverage"
                 ],
+                "online_p50_ms": (
+                    low_load_latency["p50_ms"]
+                    if is_deployed_model
+                    else None
+                ),
+                "online_p95_ms": (
+                    low_load_latency["p95_ms"]
+                    if is_deployed_model
+                    else None
+                ),
                 "timing_scope": timing_scope,
                 "stage_seconds": seconds,
                 "stage_users_per_second": throughput,
@@ -368,18 +451,30 @@ def main() -> None:
         "",
         (
             "| Model | Recall@10 | NDCG@10 | MRR@10 | "
-            "Coverage | Notes |"
+            "Coverage | Online p50 | Online p95 | Notes |"
         ),
-        "|---|---:|---:|---:|---:|---|",
+        "|---|---:|---:|---:|---:|---:|---:|---|",
     ]
 
     for row in rows:
+        online_p50 = (
+            f"{row['online_p50_ms']:.3f} ms"
+            if pd.notna(row["online_p50_ms"])
+            else "-"
+        )
+        online_p95 = (
+            f"{row['online_p95_ms']:.3f} ms"
+            if pd.notna(row["online_p95_ms"])
+            else "-"
+        )
         lines.append(
             f"| {row['model']} "
             f"| {row['recall_at_10']:.6f} "
             f"| {row['ndcg_at_10']:.6f} "
             f"| {row['mrr_at_10']:.6f} "
             f"| {row['catalog_coverage']:.6f} "
+            f"| {online_p50} "
+            f"| {online_p95} "
             f"| {row['notes']} |"
         )
 
@@ -430,6 +525,47 @@ def main() -> None:
             f"| {row['stage_seconds']:.2f} "
             f"| {row['stage_users_per_second']:,.0f} |"
         )
+    lines.extend(
+        [
+            "",
+            "## Online Serving Latency",
+            "",
+            (
+                "Warm end-to-end HTTP latency for the final "
+                "diversity-aware returning-user pipeline:"
+            ),
+            "",
+            (
+                "| Concurrency | Requests | p50 (ms) | "
+                "p95 (ms) | p99 (ms) | Throughput (req/s) |"
+            ),
+            "|---:|---:|---:|---:|---:|---:|",
+        ]
+    )
+
+    for scenario in (
+        low_load_latency,
+        concurrent_latency,
+    ):
+        lines.append(
+            f"| {scenario['concurrency']} "
+            f"| {scenario['requests']} "
+            f"| {scenario['p50_ms']:.3f} "
+            f"| {scenario['p95_ms']:.3f} "
+            f"| {scenario['p99_ms']:.3f} "
+            f"| {scenario['requests_per_second']:.2f} |"
+        )
+
+    lines.extend(
+        [
+            "",
+            (
+                "Measurements use one warm Uvicorn worker over "
+                "local HTTP loopback with persistent connections. "
+                "Model startup and cross-host network latency are excluded."
+            ),
+        ]
+    )
 
     final_recall_gain = relative_change(
         diversified["recall_at_k"],
@@ -499,8 +635,10 @@ def main() -> None:
                 "showing why chronological holdout evaluation matters."
             ),
             (
-                "- Online p50 and p95 latency remain unreported until the "
-                "serving API is benchmarked."
+                f"- The deployed final pipeline serves warm Top-10 "
+                f"requests at {low_load_latency['p50_ms']:.3f} ms p50 "
+                f"and {low_load_latency['p95_ms']:.3f} ms p95 under "
+                "the concurrency-1 loopback workload."
             ),
             "",
         ]

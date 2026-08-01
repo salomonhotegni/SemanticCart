@@ -6,14 +6,14 @@ See the complete [validation ablation](video_games_5core_ablation.md) and [diver
 
 ## Held-Out Ranking Quality
 
-| Model | Recall@10 | NDCG@10 | MRR@10 | Coverage | Notes |
-|---|---:|---:|---:|---:|---|
-| Collaborative ALS | 0.071031 | 0.038802 | 0.029041 | 0.078828 | 64 latent factors |
-| OpenAI content | 0.029484 | 0.015466 | 0.011238 | 0.848242 | 512d embeddings with FAISS HNSW |
-| Long-term hybrid | 0.071031 | 0.038933 | 0.029193 | 0.078828 | ALS Top-10 reranked by long-term semantics; weight 0.6 |
-| Returning-user hybrid | 0.071031 | 0.040135 | 0.030708 | 0.078828 | ALS Top-10 reranked by one-item session intent; weight 0.5 |
-| Top-25 returning-user | 0.076001 | 0.042232 | 0.031964 | 0.099219 | Top-10 selected from 25 ALS candidates; session weight 0.5 |
-| Diversity-aware reranker | 0.076128 | 0.042313 | 0.032030 | 0.098867 | MMR with semantic, category, and price redundancy |
+| Model | Recall@10 | NDCG@10 | MRR@10 | Coverage | Online p50 | Online p95 | Notes |
+|---|---:|---:|---:|---:|---:|---:|---|
+| Collaborative ALS | 0.071031 | 0.038802 | 0.029041 | 0.078828 | - | - | 64 latent factors |
+| OpenAI content | 0.029484 | 0.015466 | 0.011238 | 0.848242 | - | - | 512d embeddings with FAISS HNSW |
+| Long-term hybrid | 0.071031 | 0.038933 | 0.029193 | 0.078828 | - | - | ALS Top-10 reranked by long-term semantics; weight 0.6 |
+| Returning-user hybrid | 0.071031 | 0.040135 | 0.030708 | 0.078828 | - | - | ALS Top-10 reranked by one-item session intent; weight 0.5 |
+| Top-25 returning-user | 0.076001 | 0.042232 | 0.031964 | 0.099219 | - | - | Top-10 selected from 25 ALS candidates; session weight 0.5 |
+| Diversity-aware reranker | 0.076128 | 0.042313 | 0.032030 | 0.098867 | 46.314 ms | 49.783 ms | MMR with semantic, category, and price redundancy |
 
 ## Validation-to-Test Generalization
 
@@ -37,6 +37,17 @@ See the complete [validation ablation](video_games_5core_ablation.md) and [diver
 | Top-25 returning-user | Top-25 relevance reranking only | 4.03 | 23,537 |
 | Diversity-aware reranker | MMR Top-10 selection only | 74.03 | 1,280 |
 
+## Online Serving Latency
+
+Warm end-to-end HTTP latency for the final diversity-aware returning-user pipeline:
+
+| Concurrency | Requests | p50 (ms) | p95 (ms) | p99 (ms) | Throughput (req/s) |
+|---:|---:|---:|---:|---:|---:|
+| 1 | 500 | 46.314 | 49.783 | 54.173 | 21.49 |
+| 8 | 500 | 757.304 | 813.658 | 842.629 | 10.53 |
+
+Measurements use one warm Uvicorn worker over local HTTP loopback with persistent connections. Model startup and cross-host network latency are excluded.
+
 Timing rows measure different offline bulk stages and are not end-to-end serving latency.
 
 ## Findings
@@ -47,4 +58,4 @@ Timing rows measure different offline bulk stages and are not end-to-end serving
 - Frozen MMR adds another 0.191% NDCG@10 while improving semantic and category diversity.
 - OpenAI semantic retrieval covers 10.8x as much of the fit catalogue as ALS.
 - All six models score lower on the later test horizon, showing why chronological holdout evaluation matters.
-- Online p50 and p95 latency remain unreported until the serving API is benchmarked.
+- The deployed final pipeline serves warm Top-10 requests at 46.314 ms p50 and 49.783 ms p95 under the concurrency-1 loopback workload.

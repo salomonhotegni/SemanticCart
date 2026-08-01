@@ -1,5 +1,6 @@
 import json
 from pathlib import Path
+import semanticcart.recommendation_service as recommendation_service_module
 
 import pandas as pd
 import pytest
@@ -457,3 +458,65 @@ def test_rejects_unknown_similar_product(
             "missing",
             k=2,
         )
+
+
+def test_reranking_receives_only_candidate_features(
+    recommendation_service: RecommendationService,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    original = (
+        recommendation_service_module
+        .rerank_diverse_candidates
+    )
+    observed = []
+
+    def capture_candidate_features(
+        candidates: pd.DataFrame,
+        item_features: pd.DataFrame,
+        *args,
+        **kwargs,
+    ) -> pd.DataFrame:
+        candidate_ids = set(
+            candidates["item_id"]
+        )
+        feature_ids = set(
+            item_features["item_id"]
+        )
+
+        observed.append(
+            (
+                len(candidate_ids),
+                len(feature_ids),
+            )
+        )
+
+        assert feature_ids == candidate_ids
+        assert len(item_features) < len(
+            recommendation_service
+            .bundle.item_features
+        )
+
+        return original(
+            candidates,
+            item_features,
+            *args,
+            **kwargs,
+        )
+
+    monkeypatch.setattr(
+        recommendation_service_module,
+        "rerank_diverse_candidates",
+        capture_candidate_features,
+    )
+
+    recommendation_service.recommend(
+        "u1",
+        k=2,
+    )
+    recommendation_service.recommend(
+        "new-user",
+        k=2,
+        session_item_ids=["a"],
+    )
+
+    assert len(observed) == 2

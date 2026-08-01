@@ -91,6 +91,12 @@ class RecommendationService:
                 "popularity",
             ]
         ].copy()
+        self._item_features_by_id = (
+            bundle.item_features.set_index(
+                "item_id",
+                drop=False,
+            )
+        )
 
         self._als_item_ids = {
             str(item_id)
@@ -265,6 +271,36 @@ class RecommendationService:
             RECOMMENDATION_COLUMNS
         ].reset_index(drop=True)
 
+    def _candidate_item_features(
+        self,
+        candidates: pd.DataFrame,
+    ) -> pd.DataFrame:
+        """Select only features required by one candidate pool."""
+        item_ids = (
+            candidates["item_id"]
+            .astype(str)
+            .drop_duplicates()
+            .tolist()
+        )
+
+        missing = [
+            item_id
+            for item_id in item_ids
+            if item_id
+            not in self._item_features_by_id.index
+        ]
+
+        if missing:
+            raise ValueError(
+                f"Missing candidate features: {missing[:5]}"
+            )
+
+        return (
+            self._item_features_by_id
+            .loc[item_ids]
+            .reset_index(drop=True)
+        )
+
     def _popularity_fallback(
         self,
         user_id: str,
@@ -375,7 +411,9 @@ class RecommendationService:
 
         diverse = rerank_diverse_candidates(
             candidates,
-            self.bundle.item_features,
+            self._candidate_item_features(
+                candidates
+            ),
             config=replace(
                 self.diversity_config,
                 k=k,
@@ -539,7 +577,9 @@ class RecommendationService:
 
         diverse = rerank_diverse_candidates(
             relevance,
-            self.bundle.item_features,
+            self._candidate_item_features(
+                relevance
+            ),
             config=replace(
                 self.diversity_config,
                 k=k,
