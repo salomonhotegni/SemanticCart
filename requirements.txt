@@ -10,3 +10,6 @@ threadpoolctl
 joblib
 tiktoken
 faiss-cpu==1.14.3
+fastapi
+uvicorn[standard]
+httpx2
