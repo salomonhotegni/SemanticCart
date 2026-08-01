@@ -20,6 +20,11 @@ from semanticcart.serving import (
     ServingBundle,
     sha256_file,
 )
+from semanticcart.recommendation_service import (
+    RECOMMENDATION_COLUMNS,
+    SIMILAR_COLUMNS,
+    RecommendationService,
+)
 
 
 @pytest.fixture
@@ -316,3 +321,139 @@ def test_rejects_invalid_version_pointer(
         match="one directory name",
     ):
         ServingBundle.load(serving_root)
+
+
+@pytest.fixture
+def recommendation_service(
+    serving_root: Path,
+) -> RecommendationService:
+    """Load the tiny bundle as a runtime recommendation service."""
+    bundle = ServingBundle.load(serving_root)
+    return RecommendationService(bundle)
+
+
+def test_recommends_for_known_user(
+    recommendation_service: RecommendationService,
+) -> None:
+    result = recommendation_service.recommend(
+        "u1",
+        k=2,
+    )
+
+    assert result.columns.tolist() == RECOMMENDATION_COLUMNS
+    assert len(result) == 2
+    assert result["rank"].tolist() == [1, 2]
+    assert set(result["item_id"]).isdisjoint(
+        {"a", "b", "e"}
+    )
+    assert set(result["strategy"]) == {
+        "returning_user_recent_profile"
+    }
+
+
+def test_known_user_accepts_current_session(
+    recommendation_service: RecommendationService,
+) -> None:
+    result = recommendation_service.recommend(
+        "u1",
+        k=2,
+        session_item_ids=["e"],
+    )
+
+    assert len(result) == 2
+    assert "e" not in set(result["item_id"])
+    assert set(result["strategy"]) == {
+        "returning_user_current_session"
+    }
+
+
+def test_unknown_user_uses_semantic_session(
+    recommendation_service: RecommendationService,
+) -> None:
+    result = recommendation_service.recommend(
+        "new-user",
+        k=2,
+        session_item_ids=["a"],
+    )
+
+    assert result.columns.tolist() == RECOMMENDATION_COLUMNS
+    assert len(result) == 2
+    assert "a" not in set(result["item_id"])
+    assert set(result["strategy"]) == {
+        "anonymous_session_semantic"
+    }
+
+
+def test_unknown_user_uses_popularity_fallback(
+    recommendation_service: RecommendationService,
+) -> None:
+    result = recommendation_service.recommend(
+        "new-user",
+        k=2,
+    )
+
+    assert result["item_id"].tolist() == ["a", "b"]
+    assert result["rank"].tolist() == [1, 2]
+    assert set(result["strategy"]) == {
+        "popularity_fallback"
+    }
+
+
+def test_retrieves_similar_products(
+    recommendation_service: RecommendationService,
+) -> None:
+    result = recommendation_service.similar_products(
+        "a",
+        k=2,
+    )
+
+    assert result.columns.tolist() == SIMILAR_COLUMNS
+    assert len(result) == 2
+    assert "a" not in set(result["item_id"])
+    assert result["rank"].tolist() == [1, 2]
+    assert result["similarity_score"].is_monotonic_decreasing
+
+
+@pytest.mark.parametrize(
+    "invalid_k",
+    [0, 3, True, 1.5],
+)
+def test_rejects_invalid_recommendation_depth(
+    recommendation_service: RecommendationService,
+    invalid_k: object,
+) -> None:
+    with pytest.raises(
+        ValueError,
+        match="k must be between",
+    ):
+        recommendation_service.recommend(
+            "u1",
+            k=invalid_k,
+        )
+
+
+def test_rejects_unknown_session_product(
+    recommendation_service: RecommendationService,
+) -> None:
+    with pytest.raises(
+        ValueError,
+        match="Unknown products",
+    ):
+        recommendation_service.recommend(
+            "new-user",
+            k=2,
+            session_item_ids=["missing"],
+        )
+
+
+def test_rejects_unknown_similar_product(
+    recommendation_service: RecommendationService,
+) -> None:
+    with pytest.raises(
+        ValueError,
+        match="Unknown product",
+    ):
+        recommendation_service.similar_products(
+            "missing",
+            k=2,
+        )
