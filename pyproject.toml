@@ -1,0 +1,16 @@
+[tool.ruff]
+target-version = "py312"
+line-length = 79
+extend-exclude = [
+    ".venv",
+    ".venv_sc",
+    "data",
+]
+
+[tool.ruff.lint]
+select = [
+    "E9",
+    "F63",
+    "F7",
+    "F82",
+]
