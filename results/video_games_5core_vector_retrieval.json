@@ -1,0 +1,106 @@
+{
+  "benchmark": {
+    "concurrency": 1,
+    "k": 10,
+    "latency_scope": "warm sequential retrieval call",
+    "queries": 500,
+    "query_type": "frozen returning-user dense profiles",
+    "seed": 42,
+    "self_queries": 100,
+    "warmup_queries": 25
+  },
+  "created_at_utc": "2026-08-02T22:23:26.808548+00:00",
+  "dataset": "video_games_5core",
+  "model_version": "semanticcart-c5ef1c664d715a32",
+  "platform": "Linux-5.15.167.4-microsoft-standard-WSL2-x86_64-with-glibc2.35",
+  "results": [
+    {
+      "ef_search": 128,
+      "engine": "FAISS HNSW",
+      "latency": {
+        "maximum_ms": 0.815217,
+        "mean_ms": 0.286704632,
+        "minimum_ms": 0.148313,
+        "p50_ms": 0.270518,
+        "p95_ms": 0.41613369999999983,
+        "p99_ms": 0.6462161399999997,
+        "requests": 500,
+        "requests_per_second": 3448.907916091732,
+        "standard_deviation_ms": 0.08899115303640344,
+        "wall_seconds": 0.14497342699905857
+      },
+      "quality": {
+        "exact_top_k_set_agreement_with_faiss": 1.0,
+        "mean_top_k_overlap_with_faiss": 1.0,
+        "self_recall_at_1": 0.99,
+        "top_1_agreement_with_faiss": 1.0
+      }
+    },
+    {
+      "ef_search": 128,
+      "engine": "pgvector HNSW",
+      "latency": {
+        "maximum_ms": 18.401593,
+        "mean_ms": 2.776254192,
+        "minimum_ms": 1.352141,
+        "p50_ms": 2.5846765,
+        "p95_ms": 4.121223049999999,
+        "p99_ms": 7.997414249999993,
+        "requests": 500,
+        "requests_per_second": 359.44051955393684,
+        "standard_deviation_ms": 1.2455652846523988,
+        "wall_seconds": 1.3910507380205672
+      },
+      "quality": {
+        "exact_top_k_set_agreement_with_faiss": 0.996,
+        "mean_top_k_overlap_with_faiss": 0.9996,
+        "self_recall_at_1": 0.98,
+        "top_1_agreement_with_faiss": 1.0
+      }
+    },
+    {
+      "ef_search": 512,
+      "engine": "pgvector HNSW",
+      "latency": {
+        "maximum_ms": 10.078299,
+        "mean_ms": 5.675119304,
+        "minimum_ms": 2.691802,
+        "p50_ms": 5.733929,
+        "p95_ms": 8.183126949999997,
+        "p99_ms": 9.431585929999999,
+        "requests": 500,
+        "requests_per_second": 175.91475248209622,
+        "standard_deviation_ms": 1.5827340523626803,
+        "wall_seconds": 2.842285783000989
+      },
+      "quality": {
+        "exact_top_k_set_agreement_with_faiss": 0.996,
+        "mean_top_k_overlap_with_faiss": 0.9996,
+        "self_recall_at_1": 0.98,
+        "top_1_agreement_with_faiss": 1.0
+      }
+    },
+    {
+      "ef_search": 1000,
+      "engine": "pgvector HNSW",
+      "latency": {
+        "maximum_ms": 80.912782,
+        "mean_ms": 74.24631664399999,
+        "minimum_ms": 69.578355,
+        "p50_ms": 74.20263349999999,
+        "p95_ms": 77.97765795,
+        "p99_ms": 79.46905987,
+        "requests": 500,
+        "requests_per_second": 13.46618177348898,
+        "standard_deviation_ms": 1.9664579162135103,
+        "wall_seconds": 37.13004980998812
+      },
+      "quality": {
+        "exact_top_k_set_agreement_with_faiss": 0.996,
+        "mean_top_k_overlap_with_faiss": 0.9996,
+        "self_recall_at_1": 0.99,
+        "top_1_agreement_with_faiss": 0.994
+      }
+    }
+  ]
+}
