@@ -3,9 +3,9 @@ from datetime import datetime, timedelta, timezone
 import pytest
 
 from semanticcart.events import (
+    EventStore,
     InMemoryEventStore,
 )
-
 
 def test_appends_normalized_event() -> None:
     store = InMemoryEventStore()
@@ -200,3 +200,12 @@ def test_rejects_invalid_recent_item_depth(
             "user-1",
             max_items=max_items,
         )
+
+
+def test_in_memory_store_satisfies_contract() -> None:
+    store = InMemoryEventStore()
+
+    assert isinstance(store, EventStore)
+
+    store.open()
+    store.close()

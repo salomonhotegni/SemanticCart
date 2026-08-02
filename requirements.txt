@@ -13,3 +13,4 @@ faiss-cpu==1.14.3
 fastapi
 uvicorn[standard]
 httpx2
+psycopg[binary,pool]==3.3.4

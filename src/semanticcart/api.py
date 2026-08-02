@@ -17,6 +17,7 @@ from fastapi import (
     status,
 )
 from semanticcart.events import (
+    EventStore,
     EventType,
     InMemoryEventStore,
 )
@@ -27,6 +28,9 @@ from semanticcart.recommendation_service import (
     RecommendationService,
 )
 from semanticcart.serving import ServingBundle
+from semanticcart.postgres_events import (
+    PostgresEventStore,
+)
 
 
 class ProductMetadata(BaseModel):
@@ -82,11 +86,11 @@ class SimilarProductsResponse(BaseModel):
 
 
 class HealthResponse(BaseModel):
-    """Describe service readiness and the loaded model version."""
+    """Describe service readiness and loaded runtime backends."""
 
     status: str
     model_version: str
-
+    event_store: str
 
 class InteractionEventRequest(BaseModel):
     """Validate an interaction submitted by an API client."""
@@ -146,7 +150,7 @@ def _runtime_service(
 
 def _runtime_event_store(
     request: Request,
-) -> InMemoryEventStore:
+) -> EventStore:
     """Return the initialized online event store."""
     event_store = getattr(
         request.app.state,
@@ -163,10 +167,34 @@ def _runtime_event_store(
     return event_store
 
 
+def _build_event_store(
+    database_url: str | None = None,
+) -> EventStore:
+    """Build PostgreSQL storage when configured, otherwise memory."""
+    configured_url = (
+        database_url
+        if database_url is not None
+        else os.getenv(
+            "SEMANTICCART_DATABASE_URL"
+        )
+    )
+
+    if (
+        configured_url is None
+        or not configured_url.strip()
+    ):
+        return InMemoryEventStore()
+
+    return PostgresEventStore(
+        configured_url
+    )
+
+
 def create_app(
     serving_root: str | Path | None = None,
     service: RecommendationService | None = None,
-    event_store: InMemoryEventStore | None = None,
+    event_store: EventStore | None = None,
+    database_url: str | None = None,
     verify_checksums: bool = True,
 ) -> FastAPI:
     """Create an application with an injected or startup-loaded service.
@@ -175,6 +203,8 @@ def create_app(
         serving_root: Directory containing CURRENT and versioned bundles.
         service: Optional preloaded service, primarily for isolated tests.
         verify_checksums: Whether startup verifies all bundle checksums.
+        event_store: Optional persistent or process-local event storage.
+        database_url: Optional PostgreSQL URL used when no store is injected.
 
     Returns:
         A configured FastAPI application.
@@ -202,21 +232,35 @@ def create_app(
             )
             runtime = RecommendationService(bundle)
 
+        runtime_store = (
+            event_store
+            if event_store is not None
+            else _build_event_store(
+                database_url
+            )
+        )
+
+        await run_in_threadpool(
+            runtime_store.open
+        )
+
         application.state.recommendation_service = (
             runtime
         )
         application.state.event_store = (
-            event_store
-            if event_store is not None
-            else InMemoryEventStore()
+            runtime_store
         )
 
-        yield
-
-        application.state.event_store = None
-        application.state.recommendation_service = (
-            None
-        )
+        try:
+            yield
+        finally:
+            application.state.event_store = None
+            application.state.recommendation_service = (
+                None
+            )
+            await run_in_threadpool(
+                runtime_store.close
+            )
 
     application = FastAPI(
         title="SemanticCart API",
@@ -236,10 +280,14 @@ def create_app(
         request: Request,
     ) -> HealthResponse:
         runtime = _runtime_service(request)
+        event_store = _runtime_event_store(
+            request
+        )
 
         return HealthResponse(
             status="ok",
             model_version=runtime.bundle.version,
+            event_store=event_store.backend,
         )
 
     @application.get(

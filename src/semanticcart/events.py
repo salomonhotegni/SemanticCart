@@ -3,7 +3,11 @@
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from threading import RLock
-from typing import Literal
+from typing import (
+    Literal,
+    Protocol,
+    runtime_checkable,
+)
 from uuid import uuid4
 
 
@@ -24,6 +28,79 @@ class StoredInteractionEvent:
     occurred_at: datetime
 
 
+@runtime_checkable
+class EventStore(Protocol):
+    """Define storage operations required by the API."""
+    backend: str
+    def open(self) -> None:
+        """Acquire resources and verify storage readiness."""
+        ...
+
+    def close(self) -> None:
+        """Release storage resources."""
+        ...
+
+    def append(
+        self,
+        user_id: str,
+        item_id: str,
+        event_type: EventType,
+        occurred_at: datetime | None = None,
+    ) -> StoredInteractionEvent:
+        """Persist one interaction event."""
+        ...
+
+    def recent_item_ids(
+        self,
+        user_id: str,
+        max_items: int,
+    ) -> list[str]:
+        """Return recent unique products in chronological order."""
+        ...
+
+
+def create_interaction_event(
+    user_id: str,
+    item_id: str,
+    event_type: EventType,
+    occurred_at: datetime | None = None,
+) -> StoredInteractionEvent:
+    """Validate and normalize one incoming interaction."""
+    user_id = str(user_id).strip()
+    item_id = str(item_id).strip()
+
+    if not user_id:
+        raise ValueError("user_id cannot be empty.")
+    if not item_id:
+        raise ValueError("item_id cannot be empty.")
+    if event_type not in VALID_EVENT_TYPES:
+        raise ValueError(
+            f"Unsupported event type: {event_type}"
+        )
+
+    timestamp = (
+        occurred_at
+        if occurred_at is not None
+        else datetime.now(timezone.utc)
+    )
+
+    if timestamp.tzinfo is None:
+        timestamp = timestamp.replace(
+            tzinfo=timezone.utc
+        )
+    else:
+        timestamp = timestamp.astimezone(
+            timezone.utc
+        )
+
+    return StoredInteractionEvent(
+        event_id=uuid4().hex,
+        user_id=user_id,
+        item_id=item_id,
+        event_type=event_type,
+        occurred_at=timestamp,
+    )
+
 class InMemoryEventStore:
     """Maintain bounded recent histories for local API serving.
 
@@ -31,7 +108,7 @@ class InMemoryEventStore:
     testing. A PostgreSQL implementation can later provide the same append
     and recent-item operations without changing recommendation logic.
     """
-
+    backend = "memory"
     def __init__(
         self,
         max_events_per_user: int = 100,
@@ -53,6 +130,14 @@ class InMemoryEventStore:
             list[StoredInteractionEvent],
         ] = {}
         self._lock = RLock()
+
+    def open(self) -> None:
+        """Initialize the process-local store."""
+        return None
+
+    def close(self) -> None:
+        """Release resources held by the process-local store."""
+        return None
 
     def append(
         self,
@@ -89,12 +174,11 @@ class InMemoryEventStore:
                 timezone.utc
             )
 
-        event = StoredInteractionEvent(
-            event_id=uuid4().hex,
+        event = create_interaction_event(
             user_id=user_id,
             item_id=item_id,
             event_type=event_type,
-            occurred_at=timestamp,
+            occurred_at=occurred_at,
         )
 
         with self._lock:

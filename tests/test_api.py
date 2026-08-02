@@ -4,8 +4,14 @@ import pandas as pd
 import pytest
 from fastapi.testclient import TestClient
 
-from semanticcart.api import create_app
+from semanticcart.api import (
+    _build_event_store,
+    create_app,
+)
 from semanticcart.events import InMemoryEventStore
+from semanticcart.postgres_events import (
+    PostgresEventStore,
+)
 
 
 class StubBundle:
@@ -144,8 +150,8 @@ def test_health_reports_loaded_version(
     assert response.json() == {
         "status": "ok",
         "model_version": "semanticcart-test-api",
+        "event_store": "memory",
     }
-
 
 def test_model_info_returns_bundle_metadata(
     api_runtime,
@@ -353,3 +359,42 @@ def test_query_validation_rejects_nonpositive_depth(
     response = client.get(path)
 
     assert response.status_code == 422
+
+
+def test_builds_memory_store_without_database(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv(
+        "SEMANTICCART_DATABASE_URL",
+        raising=False,
+    )
+
+    store = _build_event_store()
+
+    assert isinstance(
+        store,
+        InMemoryEventStore,
+    )
+    assert store.backend == "memory"
+
+
+def test_builds_postgres_store_from_environment(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv(
+        "SEMANTICCART_DATABASE_URL",
+        (
+            "postgresql://semanticcart:"
+            "semanticcart@localhost:5432/"
+            "semanticcart"
+        ),
+    )
+
+    store = _build_event_store()
+
+    assert isinstance(
+        store,
+        PostgresEventStore,
+    )
+    assert store.backend == "postgresql"
+    store.close()
