@@ -14,3 +14,4 @@ fastapi
 uvicorn[standard]
 httpx2
 psycopg[binary,pool]==3.3.4
+pgvector==0.5.0
