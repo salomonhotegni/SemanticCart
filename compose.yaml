@@ -24,5 +24,44 @@ services:
       start_period: 10s
     restart: unless-stopped
 
+  api:
+    image: semanticcart-api:local
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      SEMANTICCART_SERVING_ROOT: /models
+      SEMANTICCART_DATABASE_URL: ${SEMANTICCART_API_DATABASE_URL:-postgresql://semanticcart:semanticcart@postgres:5432/semanticcart}
+      OPENBLAS_NUM_THREADS: "1"
+      MKL_NUM_THREADS: "1"
+      OMP_NUM_THREADS: "1"
+      NUMEXPR_NUM_THREADS: "1"
+    ports:
+      - "${SEMANTICCART_API_PORT:-8000}:8000"
+    volumes:
+      - type: bind
+        source: ${SEMANTICCART_SERVING_HOST_PATH:-./data/artifacts/video_games_5core/serving}
+        target: /models
+        read_only: true
+    depends_on:
+      postgres:
+        condition: service_healthy
+        restart: true
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import json, urllib.request; body=json.load(urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)); assert body['status']=='ok' and body['event_store']=='postgresql'"
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 120s
+    init: true
+    stop_grace_period: 30s
+    restart: unless-stopped
+
 volumes:
   semanticcart_postgres_data:
