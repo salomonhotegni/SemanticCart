@@ -98,6 +98,11 @@ Interactive OpenAPI documentation is available at `http://127.0.0.1:8001/docs`.
 ## Interactive Demo
 
 After the Docker Compose stack is healthy, open `http://127.0.0.1:8001/demo`.
+
+[![SemanticCart interactive console showing personalized product recommendations](docs/images/semanticcart-demo.png)](docs/images/semanticcart-demo.png)
+
+*Anonymous-session semantic recommendations generated from two catalogue products. Select the image to open the full-resolution screenshot.*
+
 The same-origin interface calls the production API directly and supports:
 
 - personalized returning-user and popularity-fallback recommendations;
