@@ -1,0 +1,270 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <link rel="icon" href="data:,">
+  <title>SemanticCart Demo</title>
+  <link rel="stylesheet" href="/demo/assets/styles.css">
+  <script src="/demo/assets/app.js" defer></script>
+</head>
+<body>
+  <div class="app-shell" id="app" data-testid="recommendation-demo">
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true">SC</span>
+        <div>
+          <strong>SemanticCart</strong>
+          <span>Recommendation console</span>
+        </div>
+      </div>
+
+      <div class="service-state" id="service-state">
+        <span class="status-dot" aria-hidden="true"></span>
+        <span id="service-status">Connecting</span>
+      </div>
+    </header>
+
+    <main class="workspace">
+      <aside class="control-rail" aria-label="Recommendation controls">
+        <nav class="mode-switch" aria-label="Demo mode">
+          <button
+            class="mode-button is-active"
+            type="button"
+            data-mode="recommendations"
+            aria-pressed="true"
+          >
+            Recommend
+          </button>
+          <button
+            class="mode-button"
+            type="button"
+            data-mode="similar"
+            aria-pressed="false"
+          >
+            Similar
+          </button>
+          <button
+            class="mode-button"
+            type="button"
+            data-mode="event"
+            aria-pressed="false"
+          >
+            Event
+          </button>
+        </nav>
+
+        <section class="control-panel" data-panel="recommendations">
+          <div class="panel-heading">
+            <p class="eyebrow">Personalized ranking</p>
+            <h1>Recommendations</h1>
+          </div>
+
+          <form id="recommendation-form">
+            <label class="field">
+              <span>User ID</span>
+              <input
+                name="user_id"
+                value="demo-user"
+                autocomplete="off"
+                required
+              >
+            </label>
+
+            <label class="field">
+              <span>Current session products</span>
+              <textarea
+                name="session_item_ids"
+                rows="3"
+                placeholder="B0096QQDPK, B07YBXFDYN"
+              ></textarea>
+              <small>Comma-separated product IDs</small>
+            </label>
+
+            <label class="field">
+              <span>Results</span>
+              <select name="k">
+                <option value="3">3 products</option>
+                <option value="5">5 products</option>
+                <option value="10" selected>10 products</option>
+              </select>
+            </label>
+
+            <button class="primary-button" type="submit">
+              Generate recommendations
+            </button>
+          </form>
+        </section>
+
+        <section class="control-panel" data-panel="similar" hidden>
+          <div class="panel-heading">
+            <p class="eyebrow">Semantic retrieval</p>
+            <h1>Similar products</h1>
+          </div>
+
+          <form id="similar-form">
+            <label class="field">
+              <span>Product ID</span>
+              <input
+                name="product_id"
+                value="B0096QQDPK"
+                autocomplete="off"
+                required
+              >
+            </label>
+
+            <label class="field">
+              <span>Results</span>
+              <select name="k">
+                <option value="3">3 products</option>
+                <option value="5">5 products</option>
+                <option value="10" selected>10 products</option>
+              </select>
+            </label>
+
+            <button class="primary-button" type="submit">
+              Find similar products
+            </button>
+          </form>
+        </section>
+
+        <section class="control-panel" data-panel="event" hidden>
+          <div class="panel-heading">
+            <p class="eyebrow">Online interaction</p>
+            <h1>Record event</h1>
+          </div>
+
+          <form id="event-form">
+            <label class="field">
+              <span>User ID</span>
+              <input
+                name="user_id"
+                value="demo-user"
+                autocomplete="off"
+                required
+              >
+            </label>
+
+            <label class="field">
+              <span>Product ID</span>
+              <input
+                name="item_id"
+                value="B0096QQDPK"
+                autocomplete="off"
+                required
+              >
+            </label>
+
+            <label class="field">
+              <span>Event type</span>
+              <select name="event_type">
+                <option value="view">View</option>
+                <option value="cart">Add to cart</option>
+                <option value="purchase">Purchase</option>
+              </select>
+            </label>
+
+            <button class="primary-button" type="submit">
+              Record event
+            </button>
+          </form>
+
+          <div class="event-receipt" id="event-receipt" hidden></div>
+        </section>
+
+        <footer class="model-summary">
+          <dl>
+            <div>
+              <dt>Model</dt>
+              <dd id="model-version">Unavailable</dd>
+            </div>
+            <div>
+              <dt>Dataset</dt>
+              <dd id="model-dataset">Unavailable</dd>
+            </div>
+            <div>
+              <dt>Catalogue</dt>
+              <dd id="model-items">Unavailable</dd>
+            </div>
+          </dl>
+        </footer>
+      </aside>
+
+      <section class="results-pane" aria-labelledby="results-title">
+        <header class="results-toolbar">
+          <div>
+            <p class="eyebrow" id="results-context">Personalized ranking</p>
+            <h2 id="results-title">Recommended products</h2>
+          </div>
+          <span class="result-count" id="result-count">0 products</span>
+        </header>
+
+        <div
+          class="message-state"
+          id="loading-state"
+          role="status"
+          hidden
+        >
+          Loading products
+        </div>
+
+        <div class="message-state" id="empty-state">
+          <strong>No products loaded</strong>
+        </div>
+
+        <div
+          class="message-state is-error"
+          id="error-state"
+          role="alert"
+          hidden
+        ></div>
+
+        <div
+          class="product-grid"
+          id="product-grid"
+          aria-live="polite"
+        ></div>
+      </section>
+    </main>
+
+    <div class="toast" id="toast" role="status" hidden></div>
+  </div>
+
+  <template id="product-card-template">
+    <article class="product-card">
+      <figure class="product-image">
+        <img alt="" loading="lazy">
+        <span class="image-fallback">Image unavailable</span>
+      </figure>
+
+      <div class="product-content">
+        <div class="product-rank"></div>
+        <h3 class="product-title"></h3>
+        <p class="product-category"></p>
+        <p class="product-store"></p>
+
+        <dl class="score-list">
+          <div>
+            <dt>Score</dt>
+            <dd class="product-score"></dd>
+          </div>
+          <div>
+            <dt>Price</dt>
+            <dd class="product-price"></dd>
+          </div>
+        </dl>
+
+        <div class="product-actions">
+          <button class="secondary-button similar-action" type="button">
+            Find similar
+          </button>
+          <button class="quiet-button event-action" type="button">
+            Record view
+          </button>
+        </div>
+      </div>
+    </article>
+  </template>
+</body>
+</html>

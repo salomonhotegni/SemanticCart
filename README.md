@@ -88,6 +88,20 @@ curl "http://127.0.0.1:8001/model-info"
 
 Interactive OpenAPI documentation is available at `http://127.0.0.1:8001/docs`.
 
+## Interactive Demo
+
+After the Docker Compose stack is healthy, open `http://127.0.0.1:8001/demo`.
+The same-origin interface calls the production API directly and supports:
+
+- personalized returning-user and popularity-fallback recommendations;
+- explicit session histories for anonymous semantic recommendations;
+- similar-product retrieval with catalogue images and scores;
+- persisted view, cart, and purchase events through PostgreSQL.
+
+The demo is packaged inside the API image, requires no separate frontend
+server, and reflows from a desktop recommendation workbench to mobile product
+rows without horizontal overflow.
+
 ## Offline Reproduction
 
 Download the [Amazon Reviews 2023 Video Games 5-core interactions](https://amazon-reviews-2023.github.io/data_processing/5core.html) and the pinned [Video Games metadata snapshot](https://huggingface.co/datasets/McAuley-Lab/Amazon-Reviews-2023/blob/8e8816d7d7312396fcac4d5bdd64a63d0b254e56/raw_meta_Video_Games/full-00000-of-00001.parquet):

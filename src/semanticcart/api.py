@@ -31,7 +31,13 @@ from semanticcart.serving import ServingBundle
 from semanticcart.postgres_events import (
     PostgresEventStore,
 )
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 
+
+DEMO_DIRECTORY = (
+    Path(__file__).resolve().parent / "demo"
+)
 
 class ProductMetadata(BaseModel):
     """Describe catalogue metadata returned by recommendation endpoints."""
@@ -270,6 +276,22 @@ def create_app(
         version="0.1.0",
         lifespan=lifespan,
     )
+    application.mount(
+        "/demo/assets",
+        StaticFiles(directory=DEMO_DIRECTORY),
+        name="demo-assets",
+    )
+
+    @application.get(
+        "/demo",
+        response_class=FileResponse,
+        include_in_schema=False,
+    )
+    async def demo() -> FileResponse:
+        """Serve the interactive recommendation demo."""
+        return FileResponse(
+            DEMO_DIRECTORY / "index.html"
+        )
 
     @application.get(
         "/health",

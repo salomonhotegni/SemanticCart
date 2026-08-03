@@ -398,3 +398,50 @@ def test_builds_postgres_store_from_environment(
     )
     assert store.backend == "postgresql"
     store.close()
+
+
+def test_serves_demo_application_shell(
+    api_runtime,
+) -> None:
+    client, _, _ = api_runtime
+
+    response = client.get("/demo")
+
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith(
+        "text/html"
+    )
+    assert "<title>SemanticCart Demo</title>" in response.text
+    assert 'data-testid="recommendation-demo"' in response.text
+
+
+@pytest.mark.parametrize(
+    ("path", "content_type", "marker"),
+    [
+        (
+            "/demo/assets/styles.css",
+            "text/css",
+            "--accent",
+        ),
+        (
+            "/demo/assets/app.js",
+            "text/javascript",
+            "async function bootstrap",
+        ),
+    ],
+)
+def test_serves_demo_assets(
+    api_runtime,
+    path: str,
+    content_type: str,
+    marker: str,
+) -> None:
+    client, _, _ = api_runtime
+
+    response = client.get(path)
+
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith(
+        content_type
+    )
+    assert marker in response.text
