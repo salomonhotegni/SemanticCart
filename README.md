@@ -6,6 +6,13 @@ A hybrid, session-aware product recommender combining implicit collaborative fil
 
 SemanticCart was evaluated on the Amazon Reviews 2023 Video Games 5-core dataset: 94,762 users, 25,612 products, and 814,586 chronologically ordered interactions. The final model improves held-out NDCG@10 by **9.0%** over implicit ALS while supporting products and sessions without collaborative history.
 
+## Portfolio Highlights
+
+- Built an end-to-end hybrid recommender over 814,586 chronological interactions, combining implicit ALS, 512-dimensional OpenAI embeddings, recent-session intent, and diversity-aware MMR reranking.
+- Improved frozen-test Recall@10 by 7.2%, NDCG@10 by 9.0%, MRR@10 by 10.3%, and catalogue coverage by 25.4% over the collaborative ALS baseline without tuning on the test split.
+- Packaged a versioned 331.77 MiB serving bundle behind FastAPI and Docker Compose with PostgreSQL event persistence, FAISS retrieval, pgvector validation, and an interactive recommendation console.
+- Measured 49.783 ms end-to-end p95 latency across 500 sequential loopback requests and 0.416 ms FAISS retrieval p95; enforced reproducibility with content-hashed embedding caches, 248 automated tests, and four GitHub Actions quality gates.
+
 ## System Architecture
 
 ```mermaid
